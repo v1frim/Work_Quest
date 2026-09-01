@@ -149,6 +149,37 @@ const SCRIPT = `(function () {
     localStorage.setItem("workquest_backup_date_v1", todayKey());
     ok("копія сьогодні → вік 0", backupAgeDays(), 0);
 
+    // 11b. Ціль зі списком кроків і підкроків.
+    localStorage.clear();
+    addGoalSteps("Розширити асортимент",
+      "Знайти постачальників\\n  Китай\\n  Туреччина\\nЗавести флагманів", 300);
+    const gs = loadGoals()[0];
+    ok("режим кроків", gs.mode, "steps");
+    ok("кроків верхнього рівня", gs.steps.length, 2);
+    ok("підкроків у першого", gs.steps[0].subs.length, 2);
+    // Листок — підкрок, а якщо підкроків немає, то сам крок: 2 + 1 = 3.
+    ok("листків усього", goalProgress(loadGoals()[0]).tot, 3);
+
+    toggleStep(gs.id, gs.steps[0].subs[0].id);
+    ok("підкрок закрито", goalProgress(loadGoals()[0]).cur, 1);
+    ok("батько ще не закритий", loadGoals()[0].steps[0].done, false);
+    toggleStep(gs.id, gs.steps[0].subs[1].id);
+    ok("батько закрився сам", loadGoals()[0].steps[0].done, true);
+    ok("ціль ще не досягнута", S().goals.done, 0);
+
+    toggleStep(gs.id, gs.steps[1].id);
+    ok("ціль досягнута останнім кроком", S().goals.done, 1);
+    ok("XP за ціль нараховано", S().xp.total, 300);
+
+    // Симетрія: зняв галочку — XP іде рівно той, що дали.
+    toggleStep(gs.id, gs.steps[1].id);
+    ok("ціль знову відкрита", S().goals.done, 0);
+    ok("XP знято симетрично", S().xp.total, 0);
+
+    // Крок із підкроками — перемикач усієї гілки.
+    toggleStep(gs.id, gs.steps[0].id);
+    ok("зняття батька зняло підкроки", goalProgress(loadGoals()[0]).cur, 0);
+
     // 12. ⚠️ МІГРАЦІЯ РЕЄСТРУ СКЛАДНОСТЕЙ.
     // Реєстр належить користувачу, тож нова стандартна складність не може
     // приїхати просто правкою config.js — саме на цьому проєкт уже спіткнувся.

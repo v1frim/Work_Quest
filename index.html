@@ -233,7 +233,10 @@ h1 {
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: var(--gold);
 }
-.sub { text-align: center; color: var(--tx-3); font-size: 13px; margin: 0 0 22px; }
+/* ⚠️ НЕ називати класи загальними словами (.sub, .row, .box): підкроки цілі
+   мали клас "step sub" і мовчки успадкували звідси text-align:center й
+   margin-bottom:22px. Ні консоль, ні тести такого не бачать — тільки очі. */
+.card-sub { text-align: center; color: var(--tx-3); font-size: 13px; margin: 0 0 22px; }
 
 /* — рядок «сьогодні» — */
 .today-row {
@@ -520,6 +523,28 @@ h1 {
 .mini:hover { color: var(--gold); border-color: rgba(255,209,102,0.4); }
 .mini.dz { margin-left: auto; }
 
+/* — кроки цілі — */
+.goal .exp { padding: 2px 6px; }
+.steps { margin-top: 8px; padding-top: 7px; border-top: var(--bd-row); }
+.step {
+  display: flex; align-items: center; gap: 7px;
+  padding: 3px 2px; font-size: 13px; color: var(--tx-2);
+}
+.step.substep { padding-left: 22px; font-size: 12px; color: var(--tx-3); }
+.step.on .step-t { text-decoration: line-through; color: var(--tx-5); }
+.step .ck {
+  flex: 0 0 auto; cursor: pointer; padding: 0 2px; line-height: 1;
+  font-size: 15px; font-family: inherit; color: var(--gold);
+  background: none; border: none;
+}
+.step-t { flex: 1 1 auto; min-width: 0; }
+.step-n { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); }
+
+/* — підписи полів у формах — */
+.lbl { flex: 0 0 132px; color: var(--tx-3); }
+.fld.grow { flex: 1 1 auto; width: auto; min-width: 0; }
+textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
+
 /* — задача в роботі — */
 .task {
   display: flex; align-items: center; gap: 8px;
@@ -685,7 +710,7 @@ h1 {
   <!-- ЦЕНТР -->
   <main class="card">
     <h1 id="app-title">WORK QUEST</h1>
-    <p class="sub" id="app-sub">Закрий ще одну задачу</p>
+    <p class="card-sub" id="app-sub">Закрий ще одну задачу</p>
 
     <div class="today-row" id="today-row"></div>
 
@@ -799,17 +824,34 @@ h1 {
       <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
     </div>
     <div class="sheet-body">
-      <div class="row2"><span style="flex:0 0 110px">Назва</span>
-        <input class="fld" id="g-title" style="flex:1 1 auto;width:auto" placeholder="Знайти 10 товарів"></div>
-      <div class="row2"><span style="flex:0 0 110px">Скільки треба</span>
-        <input class="fld" id="g-target" type="number" min="1" step="1" value="10">
-        <span style="color:var(--tx-4)">одиниця</span>
-        <input class="fld" id="g-unit" style="width:70px" placeholder="шт"></div>
-      <div class="row2"><span style="flex:0 0 110px">Вже є</span>
-        <input class="fld" id="g-current" type="number" min="0" step="1" value="0"></div>
-      <div class="row2"><span style="flex:0 0 110px">XP за виконання</span>
-        <input class="fld" id="g-xp" type="number" min="0" step="5" value="200"></div>
-      <div class="row2" style="margin-top:16px">
+      <div class="row2"><span class="lbl">Назва цілі</span>
+        <input class="fld grow" id="g-title" placeholder="Розширити асортимент"></div>
+
+      <p class="seg-cap" style="margin-top:14px">ЯК МІРЯТИ ПРОГРЕС</p>
+      <div class="seg" id="gk-row"></div>
+
+      <div id="g-num-fields">
+        <div class="row2"><span class="lbl">Мета</span>
+          <input class="fld" id="g-target" type="number" min="1" step="1" value="10" style="width:90px">
+          <input class="fld" id="g-unit" style="width:90px" placeholder="шт"></div>
+        <p class="set-note">Скільки всього треба набрати і в чому це міряється.
+          Наприклад <b>10 шт</b>, <b>100 $</b>, <b>20 год</b>. Одиниця — просто підпис, можна лишити порожньою.</p>
+        <div class="row2"><span class="lbl">Вже набрано</span>
+          <input class="fld" id="g-current" type="number" min="0" step="1" value="0" style="width:90px"></div>
+      </div>
+
+      <div id="g-step-fields" class="hidden">
+        <div class="row2" style="align-items:flex-start"><span class="lbl">Кроки</span>
+          <textarea class="fld grow" id="g-steps" rows="7" placeholder="Знайти постачальників&#10;  Китай&#10;  Туреччина&#10;Домовитись про ціни&#10;Завести 5 флагманів"></textarea></div>
+        <p class="set-note">Кожен рядок — крок. Рядок із <b>відступом</b> (два пробіли або Tab) стає
+          підкроком попереднього. Прогрес рахується за найдрібнішими пунктами, тож «3 з 7» завжди чесне.
+          Кроки можна додавати й потім, прямо в панелі.</p>
+      </div>
+
+      <div class="row2"><span class="lbl">XP за досягнення</span>
+        <input class="fld" id="g-xp" type="number" min="0" step="10" value="200" style="width:90px"></div>
+
+      <div class="row2" style="margin-top:18px">
         <button class="act" id="g-save" style="width:auto">Створити ціль</button>
         <button class="mini" data-act="close">Скасувати</button></div>
     </div>
@@ -1118,8 +1160,19 @@ function sanitizeData() {
   const goals = loadGoals();
   for (const g of goals) {
     if (!g.id) { g.id = rid("g_"); gf++; }
-    if (typeof g.target !== "number" || g.target <= 0) { g.target = 1; gf++; }
-    if (typeof g.current !== "number" || g.current < 0) { g.current = 0; gf++; }
+    // Цілі, створені до появи кроків, — числові за визначенням.
+    if (g.mode !== "steps" && g.mode !== "number") { g.mode = "number"; gf++; }
+    if (!Array.isArray(g.steps)) { g.steps = []; gf++; }
+    for (const st of g.steps) {
+      if (!st.id) { st.id = rid("s_"); gf++; }
+      if (!Array.isArray(st.subs)) { st.subs = []; gf++; }
+      // Стан кроку з підкроками — завжди похідний, ніколи не зберігається окремо.
+      if (st.subs.length) st.done = st.subs.every(x => !!x.done);
+    }
+    if (g.mode === "number") {
+      if (typeof g.target !== "number" || g.target <= 0) { g.target = 1; gf++; }
+      if (typeof g.current !== "number" || g.current < 0) { g.current = 0; gf++; }
+    }
     if (gDone(g) && !g.doneDay) { g.doneDay = dayKeyOf(g.doneAt); gf++; }
   }
   if (gf) saveGoals(goals);
@@ -1447,15 +1500,77 @@ function addByMode(title, difId) {
   return curMode() === "todo" ? addOpen(title, difId) : addDone(title, difId);
 }
 
-/* — цілі — */
+/* — цілі —
+   Ціль має два режими:
+     "number" — числовий прогрес (10 товарів, 100 $, 20 год);
+     "steps"  — список кроків із підкроками; прогрес = закриті листки / усі листки.
+   Листок — це підкрок, а якщо підкроків немає, то сам крок. Так «5 з 10»
+   лишається чесним незалежно від глибини.                                  */
+function goalLeaves(g) {
+  const out = [];
+  for (const st of (Array.isArray(g.steps) ? g.steps : [])) {
+    if (Array.isArray(st.subs) && st.subs.length) for (const sb of st.subs) out.push(sb);
+    else out.push(st);
+  }
+  return out;
+}
+function goalProgress(g) {
+  if (g.mode === "steps") {
+    const lv = goalLeaves(g);
+    return { cur: lv.filter(x => x.done).length, tot: lv.length, unit: plural(lv.length, "крок", "кроки", "кроків") };
+  }
+  return { cur: g.current | 0, tot: g.target | 0, unit: g.unit || "" };
+}
+
+// ⚠️ ОДНА функція вирішує «досягнуто чи ні» для обох режимів — інакше числовий
+// і кроковий шляхи роз'їхались би в тому, коли саме нараховувати XP.
+// Симетрія обов'язкова: зняв галочку — XP іде рівно той, що дали.
+function syncGoalDone(g) {
+  const p = goalProgress(g);
+  const reached = p.tot > 0 && p.cur >= p.tot;
+  if (reached && !gDone(g)) {
+    const now = Date.now();
+    g.doneAt = now;
+    g.doneDay = dayKeyOf(now);
+    g.xpAwarded = g.xp | 0;       // ⚠️ ЗНІМОК, як у задачі
+    return "done";
+  }
+  if (!reached && gDone(g)) {
+    g.doneAt = null; g.doneDay = null; g.xpAwarded = null;
+    return "undone";
+  }
+  return "";
+}
+
+// Кроки з тексту: рядок = крок, рядок із ВІДСТУПОМ = підкрок попереднього.
+// Правило саме про відступ, а не про дефіс: якби «-» означав підкрок, то
+// список, увесь написаний через «-», склався б у один крок із хвостом.
+function parseSteps(text) {
+  const out = [];
+  for (const raw of String(text || "").split("\n")) {
+    if (!raw.trim()) continue;
+    const isSub = /^(\t| {2,})/.test(raw);
+    const title = raw.replace(/^[\s]*[-–—•*]?\s*/, "").trim().slice(0, 200);
+    if (!title) continue;
+    if (isSub && out.length) {
+      const parent = out[out.length - 1];
+      parent.subs.push({ id: rid("s_"), title, done: false });
+    } else {
+      out.push({ id: rid("s_"), title, done: false, subs: [] });
+    }
+  }
+  return out;
+}
+
 function addGoal(title, target, unit, xp, current) {
   const t = String(title || "").trim().slice(0, 200);
   if (!t) return false;
   const goals = loadGoals();
   goals.push({
-    id: rid("g_"), title: t, note: "",
+    id: rid("g_"), title: t, note: "", mode: "number",
     target: Math.max(1, target | 0), current: Math.max(0, current | 0),
     unit: String(unit || "").trim().slice(0, 12),
+    steps: [],
     xp: Math.max(0, xp | 0),
     createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null
   });
@@ -1463,31 +1578,105 @@ function addGoal(title, target, unit, xp, current) {
   commit();
   return true;
 }
+
+function addGoalSteps(title, stepsText, xp) {
+  const t = String(title || "").trim().slice(0, 200);
+  if (!t) return false;
+  const goals = loadGoals();
+  goals.push({
+    id: rid("g_"), title: t, note: "", mode: "steps",
+    target: 0, current: 0, unit: "",
+    steps: parseSteps(stepsText),
+    xp: Math.max(0, xp | 0),
+    createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null
+  });
+  saveGoals(goals);
+  commit();
+  return true;
+}
+
+// Робота з кроками. Крок із підкроками не має власної галочки: він закритий
+// тоді й лише тоді, коли закриті всі його підкроки — інакше «3 з 7» брехало б.
+function findStep(g, id) {
+  for (const st of (g.steps || [])) {
+    if (st.id === id) return { st, parent: null };
+    for (const sb of (st.subs || [])) if (sb.id === id) return { st: sb, parent: st };
+  }
+  return null;
+}
+function toggleStep(goalId, stepId) {
+  const goals = loadGoals();
+  const g = goals.find(x => x.id === goalId);
+  if (!g) return;
+  const f = findStep(g, stepId);
+  if (!f) return;
+  const next = !f.st.done;
+  f.st.done = next;
+  // Крок із підкроками — це перемикач для всієї гілки.
+  if (!f.parent && Array.isArray(f.st.subs)) for (const sb of f.st.subs) sb.done = next;
+  // Підкрок закрив останній відкритий — закривається й батько (і навпаки).
+  if (f.parent) f.parent.done = (f.parent.subs || []).every(x => x.done);
+  const r = syncGoalDone(g);
+  saveGoals(goals);
+  commit();
+  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+}
+function addStep(goalId, title, parentId) {
+  const t = String(title || "").trim().slice(0, 200);
+  if (!t) return;
+  const goals = loadGoals();
+  const g = goals.find(x => x.id === goalId);
+  if (!g) return;
+  if (!Array.isArray(g.steps)) g.steps = [];
+  if (parentId) {
+    const f = findStep(g, parentId);
+    if (!f || f.parent) return;
+    f.st.subs.push({ id: rid("s_"), title: t, done: false });
+    f.st.done = f.st.subs.every(x => x.done);
+  } else {
+    g.steps.push({ id: rid("s_"), title: t, done: false, subs: [] });
+  }
+  syncGoalDone(g);
+  saveGoals(goals);
+  commit();
+}
+function delStep(goalId, stepId) {
+  const goals = loadGoals();
+  const g = goals.find(x => x.id === goalId);
+  if (!g) return;
+  g.steps = (g.steps || []).filter(st => {
+    st.subs = (st.subs || []).filter(sb => sb.id !== stepId);
+    if (st.subs.length) st.done = st.subs.every(x => x.done);
+    return st.id !== stepId;
+  });
+  const r = syncGoalDone(g);
+  saveGoals(goals);
+  commit();
+  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+}
 // Прогрес цілі. Досягнення цілі закриває її автоматично й нараховує XP —
 // той самий принцип заморозки, що й у задач.
 function setGoalProgress(id, value) {
   const goals = loadGoals();
   const g = goals.find(x => x.id === id);
-  if (!g) return;
+  if (!g || g.mode === "steps") return;
   g.current = Math.max(0, Math.min(g.target, Math.round(value) || 0));
-  let hit = false;
-  if (!gDone(g) && g.current >= g.target) {
-    const now = Date.now();
-    g.doneAt = now;
-    g.doneDay = dayKeyOf(now);
-    g.xpAwarded = g.xp | 0;      // ⚠️ ЗНІМОК, як і в задачі
-    hit = true;
-  }
+  const r = syncGoalDone(g);
   saveGoals(goals);
   commit();
-  if (hit) toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
 }
 function reopenGoal(id) {
   const goals = loadGoals();
   const g = goals.find(x => x.id === id);
   if (!g || !gDone(g)) return;
-  g.doneAt = null; g.doneDay = null; g.xpAwarded = null;   // XP знімається рівно той, що дали
-  if (g.current >= g.target) g.current = Math.max(0, g.target - 1);
+  if (g.mode === "steps") {
+    const lv = goalLeaves(g);
+    if (lv.length) { lv[lv.length - 1].done = false; for (const st of g.steps) st.done = (st.subs || []).length ? st.subs.every(x => x.done) : st.done; }
+  } else if (g.current >= g.target) {
+    g.current = Math.max(0, g.target - 1);
+  }
+  syncGoalDone(g);              // XP знімається рівно той, що дали
   saveGoals(goals);
   commit();
 }
@@ -1826,30 +2015,73 @@ function renderDays() {
   $("prog-list").innerHTML = h.join("");
 }
 
+// Розгорнуті цілі тримаємо в пам'яті: це стан перегляду, не дані користувача.
+const _goalOpen = new Set();
+
 function renderGoals() {
   const goals = loadGoals().slice().sort((a, b) => (gDone(a) ? 1 : 0) - (gDone(b) ? 1 : 0) || b.createdAt - a.createdAt);
   if (!goals.length) {
-    $("goal-list").innerHTML = '<div class="empty">Цілей ще немає. Ціль — це щось довше за задачу: «знайти 10 товарів», «заробити 100$».</div>';
+    $("goal-list").innerHTML = '<div class="empty">Цілей ще немає. Ціль — це щось довше за задачу: «заробити 100 $» або список кроків із підкроками.</div>';
     return;
   }
   const h = [];
   for (const g of goals) {
-    const pct = Math.min(100, (g.current / g.target) * 100);
+    const p = goalProgress(g);
+    const pct = p.tot ? Math.min(100, (p.cur / p.tot) * 100) : 0;
     const dn = gDone(g);
+    const steps = g.mode === "steps";
+    const open = _goalOpen.has(g.id);
+
     h.push(
       '<div class="goal', (dn ? ' done' : ''), '" data-goal="', escAttr(g.id), '">',
-      '<div class="goal-top"><span class="goal-t">', esc(g.title), '</span>',
+      '<div class="goal-top">',
+      (steps ? '<button class="mini exp" data-gact="exp">' + (open ? '▾' : '▸') + '</button>' : ''),
+      '<span class="goal-t">', esc(g.title), '</span>',
       '<span class="goal-xp">', (dn ? '✓ +' : '+'), (g.xp | 0), ' XP</span></div>',
       '<div class="goal-bar"><div class="goal-fill" style="width:', pct.toFixed(1), '%"></div></div>',
-      '<div class="goal-ctl">',
-      '<button class="mini" data-gact="dec">−</button>',
-      '<input class="goal-num" type="number" data-gact="set" value="', g.current, '" min="0" max="', g.target, '">',
-      '<span>/ ', g.target, ' ', esc(g.unit), '</span>',
-      '<button class="mini" data-gact="inc">+</button>',
-      (dn ? '<button class="mini" data-gact="reopen">↩</button>' : ''),
-      '<button class="mini dz" data-gact="del">🗑</button>',
-      '</div></div>'
+      '<div class="goal-ctl">'
     );
+
+    if (steps) {
+      h.push('<span>', p.cur, ' / ', p.tot, ' ', esc(p.unit), '</span>',
+             '<button class="mini" data-gact="addstep">+ крок</button>');
+    } else {
+      h.push('<button class="mini" data-gact="dec">−</button>',
+             '<input class="goal-num" type="number" data-gact="set" value="', p.cur, '" min="0" max="', p.tot, '">',
+             '<span>/ ', p.tot, ' ', esc(p.unit), '</span>',
+             '<button class="mini" data-gact="inc">+</button>');
+    }
+    h.push((dn ? '<button class="mini" data-gact="reopen">↩</button>' : ''),
+           '<button class="mini dz" data-gact="del">🗑</button>',
+           '</div>');
+
+    if (steps && open) {
+      h.push('<div class="steps">');
+      if (!g.steps.length) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
+      for (const st of g.steps) {
+        const hasSubs = (st.subs || []).length > 0;
+        h.push(
+          '<div class="step', (st.done ? ' on' : ''), '" data-step="', escAttr(st.id), '">',
+          '<button class="ck" data-sact="toggle">', (st.done ? '☑' : '☐'), '</button>',
+          '<span class="step-t">', esc(st.title), '</span>',
+          (hasSubs ? '<span class="step-n">' + st.subs.filter(x => x.done).length + '/' + st.subs.length + '</span>' : ''),
+          '<button class="mini" data-sact="addsub" title="Додати підкрок">+</button>',
+          '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
+          '</div>'
+        );
+        for (const sb of (st.subs || [])) {
+          h.push(
+            '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
+            '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
+            '<span class="step-t">', esc(sb.title), '</span>',
+            '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
+            '</div>'
+          );
+        }
+      }
+      h.push('</div>');
+    }
+    h.push('</div>');
   }
   $("goal-list").innerHTML = h.join("");
 }
@@ -2073,7 +2305,7 @@ function reopenDayLog() {
   openDayLog(String(m.dataset.days || "").split(",").filter(Boolean), m.dataset.dif, m.dataset.label);
 }
 
-function openGoalModal() { $("goal-modal").classList.remove("hidden"); $("g-title").focus(); }
+function openGoalModal() { setGoalKind(_goalKind); $("goal-modal").classList.remove("hidden"); $("g-title").focus(); }
 function closeGoalModal() { $("goal-modal").classList.add("hidden"); }
 
 /* ─── §13 · ОБРОБНИКИ ────────────────────────────────────────────────────── */
@@ -2111,10 +2343,31 @@ $("goal-list").addEventListener("click", e => {
   const g = loadGoals().find(x => x.id === id);
   if (!g) return;
   const act = btn.dataset.gact;
-  if (act === "inc") setGoalProgress(id, g.current + 1);
-  else if (act === "dec") setGoalProgress(id, g.current - 1);
+  if (act === "inc") setGoalProgress(id, (g.current | 0) + 1);
+  else if (act === "dec") setGoalProgress(id, (g.current | 0) - 1);
   else if (act === "reopen") reopenGoal(id);
   else if (act === "del") deleteGoal(id);
+  else if (act === "exp") { _goalOpen.has(id) ? _goalOpen.delete(id) : _goalOpen.add(id); refresh("goals"); }
+  else if (act === "addstep") {
+    const t = prompt("Новий крок:");
+    if (t) { _goalOpen.add(id); addStep(id, t, null); }
+  }
+});
+
+// Кроки й підкроки — окремим делегованим обробником, щоб не плутати з діями цілі.
+$("goal-list").addEventListener("click", e => {
+  const box = e.target.closest("[data-goal]");
+  const row = e.target.closest("[data-step]");
+  const btn = e.target.closest("[data-sact]");
+  if (!box || !row || !btn) return;
+  const gid = box.dataset.goal, sid = row.dataset.step;
+  const act = btn.dataset.sact;
+  if (act === "toggle") toggleStep(gid, sid);
+  else if (act === "del") delStep(gid, sid);
+  else if (act === "addsub") {
+    const t = prompt("Підкрок:");
+    if (t) addStep(gid, t, sid);
+  }
 });
 // ⚠️ change, не input: input перемальовував би список на кожній цифрі
 // й забирав фокус із поля, яке саме редагують.
@@ -2173,10 +2426,30 @@ $("import-file").addEventListener("change", e => {
   r.readAsText(f);
 });
 
+let _goalKind = "number";
+function setGoalKind(k) {
+  _goalKind = (k === "steps") ? "steps" : "number";
+  $("gk-row").innerHTML = [
+    '<button class="seg-btn', (_goalKind === "number" ? ' on' : ''), '" data-gkind="number">Число',
+    (_goalKind === "number" ? '<span class="ck">✓</span>' : ''), '</button>',
+    '<button class="seg-btn', (_goalKind === "steps" ? ' on' : ''), '" data-gkind="steps">Список кроків',
+    (_goalKind === "steps" ? '<span class="ck">✓</span>' : ''), '</button>'
+  ].join("");
+  $("g-num-fields").classList.toggle("hidden", _goalKind !== "number");
+  $("g-step-fields").classList.toggle("hidden", _goalKind !== "steps");
+}
+$("gk-row").addEventListener("click", e => {
+  const b = e.target.closest("[data-gkind]");
+  if (b) setGoalKind(b.dataset.gkind);
+});
+
 $("g-save").addEventListener("click", () => {
-  const ok = addGoal($("g-title").value, +$("g-target").value, $("g-unit").value, +$("g-xp").value, +$("g-current").value);
+  const ok = _goalKind === "steps"
+    ? addGoalSteps($("g-title").value, $("g-steps").value, +$("g-xp").value)
+    : addGoal($("g-title").value, +$("g-target").value, $("g-unit").value, +$("g-xp").value, +$("g-current").value);
   if (!ok) { $("g-title").focus(); return; }
   $("g-title").value = "";
+  $("g-steps").value = "";
   closeGoalModal();
 });
 
