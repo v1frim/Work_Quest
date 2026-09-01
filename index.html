@@ -542,7 +542,7 @@ h1 {
 .goal-bar { height: 6px; margin: 7px 0 5px; border-radius: var(--r-pill); background: rgba(255,255,255,0.09); overflow: hidden; }
 .goal-fill{ height: 100%; border-radius: var(--r-pill); background: var(--grad-gold); transition: width var(--t-data) ease; }
 .goal.done .goal-fill { background: linear-gradient(180deg, #a8f0a8, var(--st-done)); }
-.goal-ctl { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--tx-4); }
+.goal-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; row-gap: 6px; font-size: 12px; color: var(--tx-4); }
 .goal-num {
   width: 62px; padding: 2px 6px; font-family: inherit; font-size: 12px;
   color: var(--tx); background: rgba(0,0,0,0.35);
@@ -568,12 +568,15 @@ h1 {
 .edit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .edit-row:first-child { margin-top: 0; }
 .edit-lbl { font-size: 11px; color: var(--tx-4); }
-.task.edit { gap: 6px; }
+.task.edit { display: flex; align-items: center; gap: 6px; }
 .task.edit .te-title { padding: 5px 9px; font-size: 13px; }
 
 /* — кроки цілі — */
 .goal .exp { padding: 2px 6px; }
 .steps { margin-top: 8px; padding-top: 7px; border-top: var(--bd-row); }
+/* Підпис над деревом: чесно каже, що кроки числової цілі (і будь-якої
+   задачі) — це план, а не джерело прогресу. */
+.steps-note { margin-bottom: 6px; font-size: 11px; color: var(--tx-5); }
 .step {
   display: flex; align-items: center; gap: 7px;
   padding: 3px 2px; font-size: 13px; color: var(--tx-2);
@@ -607,11 +610,13 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 
 /* — задача в роботі — */
 .task {
-  display: flex; align-items: center; gap: 8px;
   padding: 7px 10px; margin-bottom: 6px;
   background: var(--solid-btn); border: var(--bd-ghost); border-left: 3px solid var(--c);
   border-radius: var(--r-btn);
 }
+/* Сам рядок задачі. Обгортка потрібна, бо під ним тепер живе дерево кроків. */
+.task-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 6px; }
+.task .exp { padding: 2px 6px; }
 .task-t { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--tx-1); }
 .task-x { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--c); }
 
@@ -1271,6 +1276,13 @@ function sanitizeData() {
     } else if (t.doneDay || t.xpAwarded != null || t.difSnap) {
       t.doneDay = null; t.xpAwarded = null; t.difSnap = null; fixed++;
     }
+    // Кроки в задачі — така сама форма, як у цілі: «крок → підкроки».
+    if (!Array.isArray(t.steps)) { t.steps = []; fixed++; }
+    for (const st of t.steps) {
+      if (!st.id) { st.id = rid("s_"); fixed++; }
+      if (!Array.isArray(st.subs)) { st.subs = []; fixed++; }
+      if (st.subs.length) st.done = st.subs.every(x => !!x.done);
+    }
   }
   if (fixed) saveTasks(tasks);
 
@@ -1562,7 +1574,7 @@ function addDone(title, difId) {
   const now = Date.now();
   const tasks = loadTasks();
   tasks.push({
-    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [],
+    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [], steps: [],
     createdAt: now,
     doneAt: now,
     // ⚠️ Межа доби вирішується ОДИН раз, у момент події. Обчислення на льоту
@@ -1585,7 +1597,7 @@ function addOpen(title, difId) {
   if (!t) return false;
   const tasks = loadTasks();
   tasks.push({
-    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [],
+    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [], steps: [],
     createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null, difSnap: null
   });
   saveTasks(tasks);
@@ -1791,62 +1803,71 @@ function addGoalSteps(title, steps, xp) {
 
 // Робота з кроками. Крок із підкроками не має власної галочки: він закритий
 // тоді й лише тоді, коли закриті всі його підкроки — інакше «3 з 7» брехало б.
-function findStep(g, id) {
-  for (const st of (g.steps || [])) {
+//
+// ⚠️ Кроки живуть І в цілях, І в задачах — форма однакова, тож і код один
+// (kind: "goal" | "task"). Різниця лише в наслідках:
+//   • ціль у режимі "steps" — кроки Є її прогресом;
+//   • ціль числова — кроки це ПЛАН, прогрес рахується числом;
+//   • задача — кроки завжди лише план. Задачу закриває користувач кнопкою ✓,
+//     бо саме там нараховується XP за складністю; автозакриття по останньому
+//     кроку зробило б момент нарахування непередбачуваним.
+function loadOwners(kind) { return kind === "task" ? loadTasks() : loadGoals(); }
+function saveOwners(kind, list) { if (kind === "task") saveTasks(list); else saveGoals(list); }
+
+function findStep(o, id) {
+  for (const st of (o.steps || [])) {
     if (st.id === id) return { st, parent: null };
     for (const sb of (st.subs || [])) if (sb.id === id) return { st: sb, parent: st };
   }
   return null;
 }
-function toggleStep(goalId, stepId) {
-  const goals = loadGoals();
-  const g = goals.find(x => x.id === goalId);
-  if (!g) return;
-  const f = findStep(g, stepId);
-  if (!f) return;
-  const next = !f.st.done;
-  f.st.done = next;
-  // Крок із підкроками — це перемикач для всієї гілки.
-  if (!f.parent && Array.isArray(f.st.subs)) for (const sb of f.st.subs) sb.done = next;
-  // Підкрок закрив останній відкритий — закривається й батько (і навпаки).
-  if (f.parent) f.parent.done = (f.parent.subs || []).every(x => x.done);
-  const r = syncGoalDone(g);
-  saveGoals(goals);
+// Єдина точка зміни дерева кроків: завантажити → змінити → звірити ціль →
+// зберегти → commit(). Окремі шляхи для цілі й задачі роз'їхались би.
+function stepEdit(kind, ownerId, fn) {
+  const list = loadOwners(kind);
+  const o = list.find(x => x.id === ownerId);
+  if (!o) return;
+  if (!Array.isArray(o.steps)) o.steps = [];
+  if (fn(o) === false) return;
+  const r = kind === "goal" ? syncGoalDone(o) : "";
+  saveOwners(kind, list);
   commit();
-  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (o.xp | 0) + " XP", true);
 }
-function addStep(goalId, title, parentId) {
+function toggleStep(kind, ownerId, stepId) {
+  stepEdit(kind, ownerId, o => {
+    const f = findStep(o, stepId);
+    if (!f) return false;
+    const next = !f.st.done;
+    f.st.done = next;
+    // Крок із підкроками — це перемикач для всієї гілки.
+    if (!f.parent && Array.isArray(f.st.subs)) for (const sb of f.st.subs) sb.done = next;
+    // Підкрок закрив останній відкритий — закривається й батько (і навпаки).
+    if (f.parent) f.parent.done = (f.parent.subs || []).every(x => x.done);
+  });
+}
+function addStep(kind, ownerId, title, parentId) {
   const t = String(title || "").trim().slice(0, 200);
   if (!t) return;
-  const goals = loadGoals();
-  const g = goals.find(x => x.id === goalId);
-  if (!g) return;
-  if (!Array.isArray(g.steps)) g.steps = [];
-  if (parentId) {
-    const f = findStep(g, parentId);
-    if (!f || f.parent) return;
-    f.st.subs.push({ id: rid("s_"), title: t, done: false });
-    f.st.done = f.st.subs.every(x => x.done);
-  } else {
-    g.steps.push({ id: rid("s_"), title: t, done: false, subs: [] });
-  }
-  syncGoalDone(g);
-  saveGoals(goals);
-  commit();
-}
-function delStep(goalId, stepId) {
-  const goals = loadGoals();
-  const g = goals.find(x => x.id === goalId);
-  if (!g) return;
-  g.steps = (g.steps || []).filter(st => {
-    st.subs = (st.subs || []).filter(sb => sb.id !== stepId);
-    if (st.subs.length) st.done = st.subs.every(x => x.done);
-    return st.id !== stepId;
+  stepEdit(kind, ownerId, o => {
+    if (parentId) {
+      const f = findStep(o, parentId);
+      if (!f || f.parent) return false;   // глибше двох рівнів не пускаємо
+      f.st.subs.push({ id: rid("s_"), title: t, done: false });
+      f.st.done = f.st.subs.every(x => x.done);
+    } else {
+      o.steps.push({ id: rid("s_"), title: t, done: false, subs: [] });
+    }
   });
-  const r = syncGoalDone(g);
-  saveGoals(goals);
-  commit();
-  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+}
+function delStep(kind, ownerId, stepId) {
+  stepEdit(kind, ownerId, o => {
+    o.steps = o.steps.filter(st => {
+      st.subs = (st.subs || []).filter(sb => sb.id !== stepId);
+      if (st.subs.length) st.done = st.subs.every(x => x.done);
+      return st.id !== stepId;
+    });
+  });
 }
 // Прогрес цілі. Досягнення цілі закриває її автоматично й нараховує XP —
 // той самий принцип заморозки, що й у задач.
@@ -2255,26 +2276,29 @@ function renderDays() {
   $("prog-list").innerHTML = h.join("");
 }
 
-// Розгорнуті цілі тримаємо в пам'яті: це стан перегляду, не дані користувача.
-const _goalOpen = new Set();
+// Розгорнуті рядки (цілі й задачі) тримаємо в пам'яті: це стан перегляду,
+// не дані користувача. id цілей і задач мають різні префікси, тож один Set.
+const _rowOpen = new Set();
 
 // Що зараз редагується (id або null). Стан перегляду, не дані.
 let _editTask = null;
 let _editGoal = null;
 
-// Чернетка нового кроку: {goalId, parentId|null}. Рендериться інлайн-рядком
-// у самому дереві — браузерний prompt() тут виглядав як чужорідне вікно.
+// Чернетка нового кроку: {kind, ownerId, parentId|null}. Рендериться інлайн-
+// рядком у самому дереві — браузерний prompt() тут виглядав як чужорідне вікно.
 let _stepDraft = null;
-function openStepDraft(goalId, parentId) {
-  _stepDraft = { goalId, parentId: parentId || null };
-  _goalOpen.add(goalId);
-  refresh("goals");
+const _zoneOf = (kind) => kind === "task" ? "open" : "goals";
+function openStepDraft(kind, ownerId, parentId) {
+  _stepDraft = { kind, ownerId, parentId: parentId || null };
+  _rowOpen.add(ownerId);
+  refresh(_zoneOf(kind));
   const i = $("step-draft-input");
   if (i) i.focus();
 }
 function closeStepDraft() {
+  const k = _stepDraft && _stepDraft.kind;
   _stepDraft = null;
-  refresh("goals");
+  refresh(_zoneOf(k));
 }
 function commitStepDraft() {
   const i = $("step-draft-input");
@@ -2282,7 +2306,7 @@ function commitStepDraft() {
   const t = i.value.trim();
   if (!t) { closeStepDraft(); return; }
   const d = _stepDraft;
-  addStep(d.goalId, t, d.parentId);   // commit() перемалює список...
+  addStep(d.kind, d.ownerId, t, d.parentId);   // commit() перемалює список...
   const again = $("step-draft-input");
   if (again) again.focus();           // ...а чернетка лишиться відкритою для наступного
 }
@@ -2296,6 +2320,41 @@ function draftRow(isSub) {
     '<button class="mini" data-sact="cancel" title="Скасувати (Esc)">✕</button>',
     '</div>'
   ].join("");
+}
+
+// Дерево кроків малюється однаково для цілі й для задачі — розмітка спільна,
+// тож і обробник кліків потім один (bindSteps).
+function stepsHtml(o, note) {
+  const dr = (_stepDraft && _stepDraft.ownerId === o.id) ? _stepDraft : null;
+  const steps = o.steps || [];
+  const h = ['<div class="steps">'];
+  if (note) h.push('<div class="steps-note">', esc(note), '</div>');
+  if (!steps.length && !dr) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
+  for (const st of steps) {
+    const hasSubs = (st.subs || []).length > 0;
+    h.push(
+      '<div class="step', (st.done ? ' on' : ''), '" data-step="', escAttr(st.id), '">',
+      '<button class="ck" data-sact="toggle">', (st.done ? '☑' : '☐'), '</button>',
+      '<span class="step-t">', esc(st.title), '</span>',
+      (hasSubs ? '<span class="step-n">' + st.subs.filter(x => x.done).length + '/' + st.subs.length + '</span>' : ''),
+      '<button class="mini" data-sact="addsub" title="Додати підкрок">+</button>',
+      '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
+      '</div>'
+    );
+    for (const sb of (st.subs || [])) {
+      h.push(
+        '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
+        '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
+        '<span class="step-t">', esc(sb.title), '</span>',
+        '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
+        '</div>'
+      );
+    }
+    if (dr && dr.parentId === st.id) h.push(draftRow(true));
+  }
+  if (dr && !dr.parentId) h.push(draftRow(false));
+  h.push('</div>');
+  return h.join("");
 }
 
 function renderGoals() {
@@ -2312,7 +2371,7 @@ function renderGoals() {
     const pct = p.tot ? Math.min(100, (p.cur / p.tot) * 100) : 0;
     const dn = gDone(g);
     const steps = g.mode === "steps";
-    const open = _goalOpen.has(g.id);
+    const open = _rowOpen.has(g.id);
 
     if (_editGoal === g.id) {
       // Форма редагування на місці цілі. Значення живуть в інпутах і
@@ -2335,10 +2394,14 @@ function renderGoals() {
     const tier = goalTier(g);
     h.push(
       '<div class="goal', (dn ? ' done' : ''), '" data-goal="', escAttr(g.id),
+      '" data-owner="', escAttr(g.id),
       '" style="--gc:', tier.color, ';--gc-t:', hexToRgba(tier.color, 0.10), '">',
       '<div class="goal-top">',
       '<span class="grip" data-gact="grip" title="Перетягни, щоб змінити порядок">⠿</span>',
-      (steps ? '<button class="mini exp" data-gact="exp">' + (open ? '▾' : '▸') + '</button>' : ''),
+      // ⚠️ Розгортання доступне ЗАВЖДИ, а не лише для крокових цілей: план
+      // із кроків потрібен і числовій цілі («заробити 100 $» теж має етапи).
+      '<button class="mini exp" data-gact="exp" title="', (open ? 'Згорнути' : 'Розгорнути план'), '">',
+      (open ? '▾' : '▸'), '</button>',
       '<span class="goal-t">', esc(g.title), '</span>',
       '<span class="goal-xp" title="', escAttr("вага цілі: " + tier.name), '">',
       (dn ? '✓ +' : '+'), (g.xp | 0), ' XP</span></div>',
@@ -2347,47 +2410,28 @@ function renderGoals() {
     );
 
     if (steps) {
-      h.push('<span>', p.cur, ' / ', p.tot, ' ', esc(p.unit), '</span>',
-             '<button class="mini" data-gact="addstep">+ крок</button>');
+      h.push('<span>', p.cur, ' / ', p.tot, ' ', esc(p.unit), '</span>');
     } else {
       h.push('<button class="mini" data-gact="dec">−</button>',
              '<input class="goal-num" type="number" data-gact="set" value="', p.cur, '" min="0" max="', p.tot, '">',
              '<span>/ ', p.tot, ' ', esc(p.unit), '</span>',
              '<button class="mini" data-gact="inc">+</button>');
     }
-    h.push((dn ? '<button class="mini" data-gact="reopen">↩</button>' : ''),
+    h.push('<button class="mini" data-gact="addstep" title="Додати крок">+ крок</button>',
+           (dn ? '<button class="mini" data-gact="reopen">↩</button>' : ''),
            '<button class="mini" data-gact="edit" title="Редагувати">✎</button>',
            '<button class="mini dz" data-gact="del">🗑</button>',
            '</div>');
 
-    if (steps && open) {
-      const dr = (_stepDraft && _stepDraft.goalId === g.id) ? _stepDraft : null;
-      h.push('<div class="steps">');
-      if (!g.steps.length && !dr) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
-      for (const st of g.steps) {
-        const hasSubs = (st.subs || []).length > 0;
-        h.push(
-          '<div class="step', (st.done ? ' on' : ''), '" data-step="', escAttr(st.id), '">',
-          '<button class="ck" data-sact="toggle">', (st.done ? '☑' : '☐'), '</button>',
-          '<span class="step-t">', esc(st.title), '</span>',
-          (hasSubs ? '<span class="step-n">' + st.subs.filter(x => x.done).length + '/' + st.subs.length + '</span>' : ''),
-          '<button class="mini" data-sact="addsub" title="Додати підкрок">+</button>',
-          '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
-          '</div>'
-        );
-        for (const sb of (st.subs || [])) {
-          h.push(
-            '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
-            '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
-            '<span class="step-t">', esc(sb.title), '</span>',
-            '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
-            '</div>'
-          );
-        }
-        if (dr && dr.parentId === st.id) h.push(draftRow(true));
-      }
-      if (dr && !dr.parentId) h.push(draftRow(false));
-      h.push('</div>');
+    if (open) {
+      // Для числової цілі кроки — план, а не прогрес: чесно про це кажемо,
+      // інакше «2 / 5 кроків» плуталося б із «0 / 40 тов.» на смузі.
+      const lv = goalLeaves(g);
+      const note = steps ? "" : (lv.length
+        ? "план: " + lv.filter(x => x.done).length + " / " + lv.length +
+          " · на прогрес цілі не впливає"
+        : "план цілі · на прогрес не впливає");
+      h.push(stepsHtml(g, note));
     }
     h.push('</div>');
   }
@@ -2412,13 +2456,27 @@ function renderOpen() {
       );
       continue;
     }
+    const open = _rowOpen.has(t.id);
+    const lv = goalLeaves(t);                 // листки рахуються так само, як у цілі
     h.push(
-      '<div class="task" style="--c:', d.color, '" data-task="', escAttr(t.id), '">',
+      '<div class="task" style="--c:', d.color, '" data-task="', escAttr(t.id),
+      '" data-owner="', escAttr(t.id), '">',
+      '<div class="task-top">',
+      '<button class="mini exp" data-tact="exp" title="', (open ? 'Згорнути' : 'Розгорнути підзадачі'), '">',
+      (open ? '▾' : '▸'), '</button>',
       '<span class="task-t">', esc(t.title), '</span>',
+      (lv.length ? '<span class="step-n">' + lv.filter(x => x.done).length + '/' + lv.length + '</span>' : ''),
       '<span class="task-x">+', d.xp | 0, '</span>',
+      // Компактний «＋», а не «+ крок»: у вузькій колонці задачі підпис
+      // виштовхував ✓ ✎ 🗑 на другий рядок.
+      '<button class="mini" data-tact="addstep" title="Додати підзадачу">＋</button>',
       '<button class="mini" data-tact="done" title="Виконано">✓</button>',
       '<button class="mini" data-tact="edit" title="Редагувати">✎</button>',
       '<button class="mini" data-tact="del">🗑</button>',
+      '</div>',
+      // ⚠️ Кроки задачі НЕ закривають її самі: XP дає складність, і момент
+      // нарахування має лишатись за користувачем (кнопка ✓).
+      (open ? stepsHtml(t, "підзадачі · задачу закриваєш ти кнопкою ✓") : ''),
       '</div>'
     );
   }
@@ -2671,12 +2729,8 @@ $("goal-list").addEventListener("click", e => {
   else if (act === "dec") setGoalProgress(id, (g.current | 0) - 1);
   else if (act === "reopen") reopenGoal(id);
   else if (act === "del") deleteGoal(id);
-  else if (act === "exp") {
-    if (_goalOpen.has(id)) { _goalOpen.delete(id); if (_stepDraft && _stepDraft.goalId === id) _stepDraft = null; }
-    else _goalOpen.add(id);
-    refresh("goals");
-  }
-  else if (act === "addstep") openStepDraft(id, null);
+  else if (act === "exp") { toggleRow(id); refresh("goals"); }
+  else if (act === "addstep") openStepDraft("goal", id, null);
   else if (act === "edit") {
     _editGoal = id;
     refresh("goals");
@@ -2738,33 +2792,47 @@ $("goal-list").addEventListener("dragend", () => {
   }
 });
 
-// Кроки й підкроки — окремим делегованим обробником, щоб не плутати з діями цілі.
-$("goal-list").addEventListener("click", e => {
-  const box = e.target.closest("[data-goal]");
-  const row = e.target.closest("[data-step]");
-  const btn = e.target.closest("[data-sact]");
-  if (!box || !row || !btn) return;
-  const gid = box.dataset.goal, sid = row.dataset.step;
-  const act = btn.dataset.sact;
-  if (act === "toggle") toggleStep(gid, sid);
-  else if (act === "del") delStep(gid, sid);
-  else if (act === "addsub") openStepDraft(gid, sid);
-});
-
-// Чернетка: ✓/✕ кнопками, Enter/Esc із клавіатури. Enter лишає чернетку
-// відкритою — серію кроків можна надрукувати не торкаючись миші.
-$("goal-list").addEventListener("click", e => {
-  const btn = e.target.closest("[data-sact]");
-  if (!btn || !e.target.closest(".step.draft")) return;
-  if (btn.dataset.sact === "commit") commitStepDraft();
-  else if (btn.dataset.sact === "cancel") closeStepDraft();
-});
-$("goal-list").addEventListener("keydown", e => {
-  if (e.target.id === "step-draft-input") {
+// Кроки й підкроки — СПІЛЬНИЙ обробник для цілей і задач: розмітка дерева
+// однакова, тож дублювати логіку на два списки нема сенсу. kind вирішує,
+// чий журнал редагувати.
+function toggleRow(id) {
+  if (_rowOpen.has(id)) {
+    _rowOpen.delete(id);
+    if (_stepDraft && _stepDraft.ownerId === id) _stepDraft = null;
+  } else _rowOpen.add(id);
+}
+function bindSteps(listId, kind) {
+  const el = $(listId);
+  el.addEventListener("click", e => {
+    const box = e.target.closest("[data-owner]");
+    const btn = e.target.closest("[data-sact]");
+    if (!box || !btn) return;
+    // Чернетка: ✓ додає крок і лишається відкритою, ✕ закриває.
+    if (e.target.closest(".step.draft")) {
+      if (btn.dataset.sact === "commit") commitStepDraft();
+      else if (btn.dataset.sact === "cancel") closeStepDraft();
+      return;
+    }
+    const row = e.target.closest("[data-step]");
+    if (!row) return;
+    const oid = box.dataset.owner, sid = row.dataset.step, act = btn.dataset.sact;
+    if (act === "toggle") toggleStep(kind, oid, sid);
+    else if (act === "del") delStep(kind, oid, sid);
+    else if (act === "addsub") openStepDraft(kind, oid, sid);
+  });
+  // Enter лишає чернетку відкритою — серію кроків можна надрукувати
+  // не торкаючись миші.
+  el.addEventListener("keydown", e => {
+    if (e.target.id !== "step-draft-input") return;
     if (e.key === "Enter") { e.preventDefault(); commitStepDraft(); }
     else if (e.key === "Escape") { e.stopPropagation(); closeStepDraft(); }
-    return;
-  }
+  });
+}
+bindSteps("goal-list", "goal");
+bindSteps("open-list", "task");
+
+$("goal-list").addEventListener("keydown", e => {
+  if (e.target.id === "step-draft-input") return;   // чернетку веде bindSteps
   const box = e.target.closest(".goal.edit");
   if (!box) return;
   if (e.key === "Enter") { e.preventDefault(); const b = box.querySelector('[data-gact="esave"]'); if (b) b.click(); }
@@ -2785,6 +2853,8 @@ $("open-list").addEventListener("click", e => {
   const act = btn.dataset.tact;
   if (act === "done") completeTask(box.dataset.task);
   else if (act === "del") deleteTask(box.dataset.task);
+  else if (act === "exp") { toggleRow(box.dataset.task); refresh("open"); }
+  else if (act === "addstep") openStepDraft("task", box.dataset.task, null);
   else if (act === "edit") {
     _editTask = box.dataset.task;
     refresh("open");

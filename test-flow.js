@@ -170,24 +170,24 @@ const SCRIPT = `(function () {
     // Листок — підкрок, а якщо підкроків немає, то сам крок: 2 + 1 = 3.
     ok("листків усього", goalProgress(loadGoals()[0]).tot, 3);
 
-    toggleStep(gs.id, gs.steps[0].subs[0].id);
+    toggleStep("goal", gs.id, gs.steps[0].subs[0].id);
     ok("підкрок закрито", goalProgress(loadGoals()[0]).cur, 1);
     ok("батько ще не закритий", loadGoals()[0].steps[0].done, false);
-    toggleStep(gs.id, gs.steps[0].subs[1].id);
+    toggleStep("goal", gs.id, gs.steps[0].subs[1].id);
     ok("батько закрився сам", loadGoals()[0].steps[0].done, true);
     ok("ціль ще не досягнута", S().goals.done, 0);
 
-    toggleStep(gs.id, gs.steps[1].id);
+    toggleStep("goal", gs.id, gs.steps[1].id);
     ok("ціль досягнута останнім кроком", S().goals.done, 1);
     ok("XP за ціль нараховано", S().xp.total, 300);
 
     // Симетрія: зняв галочку — XP іде рівно той, що дали.
-    toggleStep(gs.id, gs.steps[1].id);
+    toggleStep("goal", gs.id, gs.steps[1].id);
     ok("ціль знову відкрита", S().goals.done, 0);
     ok("XP знято симетрично", S().xp.total, 0);
 
     // Крок із підкроками — перемикач усієї гілки.
-    toggleStep(gs.id, gs.steps[0].id);
+    toggleStep("goal", gs.id, gs.steps[0].id);
     ok("зняття батька зняло підкроки", goalProgress(loadGoals()[0]).cur, 0);
 
     // 11c. Редактор кроків у модалці: рядки → структура.
@@ -210,12 +210,12 @@ const SCRIPT = `(function () {
     ok("редактор: порядок збережено", ge.steps[1].title, "Другий крок");
 
     // 11d. Інлайн-чернетка в панелі замість prompt().
-    openStepDraft(ge.id, null);
+    openStepDraft("goal", ge.id, null);
     document.getElementById("step-draft-input").value = "Крок із панелі";
     commitStepDraft();
     ok("чернетка: крок додано", loadGoals()[0].steps.length, 3);
     ok("чернетка лишилась відкритою", !!document.getElementById("step-draft-input"), true);
-    openStepDraft(ge.id, loadGoals()[0].steps[2].id);
+    openStepDraft("goal", ge.id, loadGoals()[0].steps[2].id);
     document.getElementById("step-draft-input").value = "Підкрок із панелі";
     commitStepDraft();
     ok("чернетка: підкрок додано", loadGoals()[0].steps[2].subs[0].title, "Підкрок із панелі");
@@ -337,7 +337,53 @@ const SCRIPT = `(function () {
     ok("колір ваги в рядку", document.getElementById("goal-list").innerHTML.indexOf(goalTier(byTitle("C")).color) >= 0, true);
     ok("ручка перетягування є", document.querySelectorAll("#goal-list .grip").length, 3);
 
-    // 16. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
+    // 16. Кроки доступні БУДЬ-ЯКІЙ цілі й будь-якій задачі, не лише кроковій.
+    localStorage.clear();
+    addGoal("Числова ціль", 40, "тов.", 800, 0);
+    const gn = loadGoals()[0];
+    addStep("goal", gn.id, "Етап один", null);
+    addStep("goal", gn.id, "Етап два", null);
+    addStep("goal", gn.id, "Дрібниця", loadGoals()[0].steps[0].id);
+    const gn2 = loadGoals()[0];
+    ok("крок додано числовій цілі", gn2.steps.length, 2);
+    ok("підкрок додано числовій цілі", gn2.steps[0].subs.length, 1);
+    ok("режим цілі не змінився", gn2.mode, "number");
+    // ⚠️ Головне: план НЕ підмінює числовий прогрес і не нараховує XP сам.
+    toggleStep("goal", gn.id, gn2.steps[1].id);
+    toggleStep("goal", gn.id, gn2.steps[0].subs[0].id);
+    ok("усі кроки закриті", goalLeaves(loadGoals()[0]).every(x => x.done), true);
+    ok("числова ціль НЕ закрилась кроками", loadGoals()[0].doneAt, null);
+    ok("XP за план не нарахований", S().xp.total, 0);
+    ok("прогрес лишився числовим", goalProgress(loadGoals()[0]).tot, 40);
+    ok("кнопка + крок є в числової цілі",
+       document.querySelector('[data-goal="' + gn.id + '"] [data-gact="addstep"]') !== null, true);
+    document.querySelector('[data-goal="' + gn.id + '"] [data-gact="exp"]').click();
+    ok("числова ціль розгортається", document.querySelectorAll("#goal-list .step").length, 3);
+
+    // Кроки в задачі: план, який не чіпає ані XP, ані момент закриття.
+    localStorage.clear();
+    addOpen("Задача з підзадачами", activeDifs()[0].id);
+    const tid = loadTasks()[0].id;
+    addStep("task", tid, "Підзадача 1", null);
+    addStep("task", tid, "Підзадача 2", null);
+    addStep("task", tid, "Дрібниця", loadTasks()[0].steps[0].id);
+    ok("кроки додано задачі", loadTasks()[0].steps.length, 2);
+    ok("підкрок додано задачі", loadTasks()[0].steps[0].subs.length, 1);
+    toggleStep("task", tid, loadTasks()[0].steps[1].id);
+    toggleStep("task", tid, loadTasks()[0].steps[0].subs[0].id);
+    ok("усі підзадачі закриті", goalLeaves(loadTasks()[0]).every(x => x.done), true);
+    ok("задача НЕ закрилась сама", loadTasks()[0].doneAt, null);
+    ok("XP за підзадачі не нарахований", S().xp.total, 0);
+    document.querySelector('[data-task="' + tid + '"] [data-tact="exp"]').click();
+    ok("задача розгортається", document.querySelectorAll("#open-list .step").length, 3);
+    delStep("task", tid, loadTasks()[0].steps[1].id);
+    ok("підзадача видаляється", loadTasks()[0].steps.length, 1);
+    completeTask(tid);
+    ok("задача закривається кнопкою", loadTasks()[0].doneAt > 0, true);
+    ok("XP дає складність, не кроки", S().xp.total, activeDifs()[0].xp);
+    ok("кроки пережили закриття задачі", loadTasks()[0].steps.length, 1);
+
+    // 17. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
     // Це саме та регресія, яку не видно в жодному числі, крім координат:
     // до фіксу висота сітки росла й вертикальне центрування зсувало все вгору.
     localStorage.clear();
