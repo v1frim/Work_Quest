@@ -131,6 +131,14 @@ const SCRIPT = `(function () {
     setMode("done");
     ok("режим повернувся", curMode(), "done");
 
+    // 8b. «+ задача» перемикає режим і підсвічує поле.
+    setMode("done");
+    document.getElementById("task-add").click();
+    ok("«+ задача» перемкнула режим", curMode(), "todo");
+    ok("фокус у полі", document.activeElement.id, "task-input");
+    ok("поле підсвічене", document.getElementById("task-input").classList.contains("flash"), true);
+    setMode("done");
+
     // 9. Перелік «що саме зроблено» за днем і складністю.
     openDayLog([todayKey()], d.id, "сьогодні");
     const log = document.getElementById("day-body").innerHTML;

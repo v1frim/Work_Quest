@@ -282,6 +282,14 @@ h1 {
   transition: border-color var(--t-fast) ease, box-shadow var(--t-fast) ease;
 }
 .field::placeholder { color: var(--tx-6); }
+/* Спалах поля — коли фокус приходить не від кліку користувача по самому полю
+   (кнопка «+ задача»), і треба показати, КУДИ саме тепер писати. */
+@keyframes fieldFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(255,209,102,0.55); border-color: var(--gold); }
+  70%  { box-shadow: 0 0 0 11px rgba(255,209,102,0); border-color: var(--gold); }
+  100% { box-shadow: 0 0 0 0 rgba(255,209,102,0); }
+}
+.field.flash { animation: fieldFlash 0.85s ease 2; }
 .field:focus { border-color: var(--gold); box-shadow: var(--sh-glow); }
 
 .dif-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
@@ -1495,6 +1503,18 @@ function setMode(m) {
   refresh("mode", "difs");
   $("task-input").focus();
 }
+
+// Фокус + спалах. ⚠️ Примусовий reflow обов'язковий: без нього повторний клік
+// по «+ задача» не перезапустить анімацію — клас той самий, браузер вважає,
+// що нічого не змінилось.
+function flashInput() {
+  const el = $("task-input");
+  el.classList.remove("flash");
+  void el.offsetWidth;
+  el.classList.add("flash");
+  el.focus();
+  setTimeout(() => el.classList.remove("flash"), 2000);
+}
 // Одна точка входу для обох режимів — щоб клік і Enter не розійшлись у поведінці.
 function addByMode(title, difId) {
   return curMode() === "todo" ? addOpen(title, difId) : addDone(title, difId);
@@ -2387,8 +2407,9 @@ $("open-list").addEventListener("click", e => {
 
 $("open-panel").addEventListener("click", e => {
   if (e.target.id === "goal-add") openGoalModal();
-  // «+ задача» більше не потрібна: планова задача створюється тим самим полем
-  // у режимі «Що зробити». Одна дія — один шлях.
+  // «+ задача» не має власної форми: вона переводить у режим «Що зробити»
+  // і підсвічує те саме поле. Одна дія — один шлях.
+  if (e.target.id === "task-add") { setMode("todo"); flashInput(); }
 });
 
 $("prog-list").addEventListener("click", e => {
