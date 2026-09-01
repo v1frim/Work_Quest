@@ -246,6 +246,37 @@ const SCRIPT = `(function () {
     runMigrations();
     ok("новому користувачу — одразу поточна схема", loadMeta().schema, WQ_SCHEMA);
 
+    // 12b. Міграція 3: товарний план засівається рівно один раз.
+    localStorage.clear();
+    localStorage.setItem("workquest_meta_v1", JSON.stringify({ schema: 2 }));
+    localStorage.setItem("workquest_tasks_v1", "[]");
+    runMigrations();
+    ok("товарні цілі засіяно", loadGoals().length, 3);
+    ok("конвеєр товару — кроками", loadGoals()[0].mode, "steps");
+    ok("стартові задачі у роботі", loadTasks().filter(t => !tDone(t)).length, 3);
+    // Відновили стару копію (схема знову 2) → міграція йде вдруге, але seedTag не дає дубля.
+    localStorage.setItem("workquest_meta_v1", JSON.stringify({ schema: 2 }));
+    runMigrations();
+    ok("повторний сід не дублює", loadGoals().length, 3);
+
+    // 13. Норма дня (план мінімум/норма): 4 задачі при плані 4 = норма.
+    localStorage.clear();
+    for (let i = 0; i < 4; i++) addDone("Норма " + i, d.id);
+    ok("норму виконано", S().today.done, 4);
+    ok("серія норми = 1", S().streak.norma, 1);
+    ok("найкраща серія норми = 1", S().streak.normaBest, 1);
+
+    // Пільга на сьогодні: вчора норма є, сьогодні ще в процесі — серія жива.
+    localStorage.clear();
+    const yk = keyFromNum(dayNum(todayKey()) - 1);
+    const TY = [];
+    for (let i = 0; i < 4; i++) TY.push({ id: "ty" + i, title: "вчора", note: "",
+      difficultyId: d.id, tags: [], createdAt: 1, doneAt: 2, doneDay: yk, xpAwarded: 5, difSnap: null });
+    localStorage.setItem("workquest_tasks_v1", JSON.stringify(TY));
+    bumpStats();
+    ok("пільга: серія норми жива зранку", S().streak.norma, 1);
+    ok("мінімум-серія сьогодні ще 0", S().streak.current, 0);
+
     localStorage.clear();
   } catch (e) {
     out.push({ name: "ВИНЯТОК", got: (e && e.message) || String(e), want: "—", pass: false });

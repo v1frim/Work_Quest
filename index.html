@@ -248,6 +248,7 @@ h1 {
   padding: 6px 13px; font-size: 13px; color: var(--tx-1);
 }
 .chip b { color: var(--gold); font-weight: 700; }
+.chip.gold { color: var(--gold); border-color: rgba(255,209,102,0.5); box-shadow: var(--sh-glow); }
 
 /* — XP-блок — */
 .xp-wrap { margin-bottom: 20px; }
@@ -472,7 +473,8 @@ h1 {
   padding: 6px 4px; border-bottom: var(--bd-row);
 }
 .prog-row.today { background: rgba(255,209,102,0.06); border-radius: var(--r-sm); }
-.prog-date { flex: 0 0 62px; font-size: 12px; color: var(--tx-3); }
+.prog-date { flex: 0 0 80px; font-size: 12px; color: var(--tx-3); }
+.prog-med { margin-right: 3px; font-size: 11px; }
 .prog-cells { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 /* Комірка складності: тінт поверх соліда + кольорова межа — читається на будь-якій фазі доби */
 .pgc {
@@ -723,7 +725,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   <!-- ЛІВА: прогрес по днях -->
   <aside class="panel" id="progress-panel">
     <div class="panel-h">📈 Прогрес по днях</div>
-    <div class="panel-sub">Задачі за складностями і XP за кожен день</div>
+    <div class="panel-sub">Складності і XP за день · ✅ мінімум · 🥇 норма</div>
     <div class="scroll" id="prog-list"></div>
   </aside>
 
@@ -1126,6 +1128,58 @@ const MIGRATIONS = {
       added++;
     }
     if (added) saveDifs(stored);
+  },
+
+  // 3 — засіяно товарний план користувача (прямий запит, сесія 2): конвеєр
+  // «Товар №1», тестова партія на 40, піврічна ціль на локомотиви і стартові
+  // задачі тижня. seedTag захищає від дубля, якщо відновлять стару копію
+  // зі схемою < 3 (міграція тоді відпрацює вдруге).
+  3: function seedTovarka() {
+    const goals = loadGoals();
+    if (goals.some(g => g && g.seedTag === "tovarka_v1")) return;
+    const now = Date.now();
+    const st = (t, subs) => ({
+      id: rid("s_"), title: t, done: false,
+      subs: (subs || []).map(x => ({ id: rid("s_"), title: x, done: false }))
+    });
+    const goal = (extra) => Object.assign({
+      id: rid("g_"), seedTag: "tovarka_v1", note: "", steps: [],
+      target: 0, current: 0, unit: "",
+      createdAt: now, doneAt: null, doneDay: null, xpAwarded: null
+    }, extra);
+
+    goals.push(
+      goal({
+        title: "Товар №1: від ідеї до полиці", mode: "steps", xp: 600,
+        steps: [
+          st("Скласти перелік класних товарів", ["8 товарів × 5 категорій (40 сумарно)"]),
+          st("Відібрати найкращі з куратором", ["Фото відібраних — у групу на погодження", "Затвердити список для тесту"]),
+          st("Протестувати рекламою в Instagram", ["Завантажити 15–20 товарів на сторінку", "Реклама $2–3/день на пост, широкий таргетинг", "3–5 постів/відео на товар"]),
+          st("Аналітика — відібрати найкращі", ["Таблиця метрик: вклали / кліки / заявки / ціна заявки", "Виявити товари-локомотиви"]),
+          st("Знайти поставщика й порахувати маржу"),
+          st("Зробити відео для повноцінної реклами"),
+          st("Виставити на Розетку та Instagram — почати продавати"),
+          st("Зайшло? Закупити опт — товар повністю доданий")
+        ]
+      }),
+      goal({ title: "Протестувати 40 товарів рекламою", mode: "number",
+             target: 40, unit: "тов.", xp: 800 }),
+      goal({ title: "10 товарів-локомотивів за пів року", mode: "number",
+             target: 10, unit: "тов.", xp: 3000 })
+    );
+    saveGoals(goals);
+
+    const tasks = loadTasks();
+    const open = (t, dif) => ({
+      id: rid("t_"), title: t, note: "", difficultyId: dif, tags: ["товарка"],
+      createdAt: now, doneAt: null, doneDay: null, xpAwarded: null, difSnap: null
+    });
+    tasks.push(
+      open("Вибрати 8 товарів у першій категорії", "d_normal"),
+      open("Скинути фото відібраних товарів куратору", "d_small"),
+      open("Підбити підсумки дня: що зробив і що далі", "d_instant")
+    );
+    saveTasks(tasks);
   }
 };
 
@@ -1304,6 +1358,27 @@ function computeStats() {
     }
   }
 
+  // Дві планки дня (задум користувача: «план мінімум і план норма»):
+  // мінімум = хоч один результат (це streak.current), норма = денний план.
+  const perDayN = Math.max(1, plan.perDay | 0);
+  let normaBest = 0, nrun = 0, nprev = null;
+  for (const k of keys) {
+    if (dayMap[k].done < perDayN) { nprev = null; continue; }
+    const n = dayNum(k);
+    nrun = (nprev !== null && n - nprev === 1) ? nrun + 1 : 1;
+    nprev = n;
+    if (nrun > normaBest) normaBest = nrun;
+  }
+  // Поточна серія норми — З ПІЛЬГОЮ на сьогодні: день ще триває, тож
+  // невиконана поки норма серію не рве. Інакше щоранку показувало б нуль.
+  let nStart = dayNum(today);
+  if (((dayMap[today] || { done: 0 }).done) < perDayN) nStart--;
+  let normaCur = 0;
+  for (let n = nStart; ; n--) {
+    const r = dayMap[keyFromNum(n)];
+    if (r && r.done >= perDayN) normaCur++; else break;
+  }
+
   // Рекорди днів
   let bDone = 0, bDoneAt = null, bXp = 0, bXpAt = null, planMet = 0;
   for (const k of keys) {
@@ -1384,7 +1459,8 @@ function computeStats() {
     yesterday: { done: y0.done },
     week: { done: wNow.done, xp: wNow.xp },
     month: { done: mNow.done, xp: mNow.xp, daysPassed: +today.slice(8, 10) },
-    streak: { current: cur, best: bestStreak, bestEnd, atRisk: t0.done === 0 && y0.done > 0 },
+    streak: { current: cur, best: bestStreak, bestEnd, atRisk: t0.done === 0 && y0.done > 0,
+              norma: normaCur, normaBest },
     best: {
       dayDone: bDone, dayDoneAt: bDoneAt, dayXp: bXp, dayXpAt: bXpAt,
       dayXpFair: bXpFair, dayXpFairAt: bXpFairAt,
@@ -1848,6 +1924,7 @@ const RENDER = {
   today:  renderToday,
   mode:   renderMode,
   backup: renderBackupBtn,
+  thermo: renderThermo,
   xp:     renderXp,
   difs:   renderDifRow,
   totals: renderTotals,
@@ -1908,15 +1985,27 @@ function renderBackupBtn() {
   if (age > 3) { b.textContent += " ⚠"; b.classList.add("warn"); }
 }
 
+// Термометр зліва = денна норма. Заливка росте з кожною задачею дня.
+function renderThermo() {
+  const s = S();
+  $("th-fill").style.height = s.plan.dayPct.toFixed(0) + "%";
+  $("th-goal").textContent = s.today.done + " / " + Math.max(1, s.plan.perDay | 0) + " з.";
+}
+
 function renderToday() {
   const s = S();
   // ⚠️ Збірка ТІЛЬКИ масивом і .join(""). Ланцюжок через '+' ламається від
   // коментаря в кінці рядка: '+' з'їдається, і половина панелі тихо зникає.
+  const perDay = Math.max(1, s.plan.perDay | 0);
+  const normaMet = s.today.done >= perDay;
   const h = [
     '<span class="chip">Сьогодні: <b>', s.today.done, '</b> ',
     plural(s.today.done, "задача", "задачі", "задач"), '</span>',
     '<span class="chip"><b>', fmtXpNum(s.today.xp), '</b> XP</span>',
-    '<span class="chip">🔥 серія <b>', s.streak.current, '</b></span>'
+    '<span class="chip">🔥 серія <b>', s.streak.current, '</b></span>',
+    '<span class="chip', (normaMet ? ' gold' : ''), '" title="Денна норма — план задач на день (⚙️)">🥇 норма <b>',
+    s.today.done, '</b>/', perDay,
+    (s.streak.norma > 1 ? ' · ' + s.streak.norma + ' дн.' : ''), '</span>'
   ];
   $("today-row").innerHTML = h.join("");
 }
@@ -1969,12 +2058,14 @@ function renderTotals() {
 // Рядок агрегату — спільний для дня, тижня, місяця й року.
 // days — список днів, які цей рядок покриває: комірка клікабельна і відкриває
 // перелік того, що саме зроблено. Тому агрегат мусить пам'ятати свої дні.
-function progRow(label, agg, isToday, days) {
+function progRow(label, agg, isToday, days, med) {
   const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
   const dd = escAttr((days || []).join(","));
   const h = ['<div class="prog-row', (isToday ? ' today' : ''), '" data-days="', dd,
              '" data-label="', escAttr(label), '">',
-             '<span class="prog-date" data-pdif="*">', esc(label), '</span><span class="prog-cells">'];
+             '<span class="prog-date" data-pdif="*">',
+             (med ? '<span class="prog-med" title="✅ мінімум · 🥇 норма">' + med + '</span>' : ''),
+             esc(label), '</span><span class="prog-cells">'];
   for (const d of difs) {
     const n = agg.byDif[d.id] || 0;
     if (!n) continue;
@@ -2026,8 +2117,14 @@ function renderDays() {
     return m;
   };
 
+  const perDay = Math.max(1, s.plan.perDay | 0);
   const h = [];
-  for (const k of recent) h.push(progRow(fmtDay(k), s.dayMap[k], k === today, [k]));
+  for (const k of recent) {
+    const r = s.dayMap[k];
+    // Медаль дня: 🥇 норма виконана, ✅ мінімум (хоч один результат).
+    const med = r.done >= perDay ? "🥇" : (r.done ? "✅" : "");
+    h.push(progRow(fmtDay(k), r, k === today, [k], med));
+  }
 
   if (inMonth.length) {
     h.push('<div class="prog-sect">ТИЖНІ · ', esc(MONTH_NAMES[+curMonth.slice(5, 7) - 1].toUpperCase()), '</div>');
@@ -2758,7 +2855,6 @@ function init() {
   $("app-sub").textContent   = WQ_TEXT.appSub;
   $("ask-label").textContent = WQ_TEXT.askDone.toUpperCase();
   $("add-hint").textContent  = WQ_TEXT.addHint;
-  $("th-goal").textContent   = loadPlan().perDay + " з.";
 
   if (!LS_OK) { console.warn(WQ_TEXT.errPrivate); showBanner(WQ_TEXT.errPrivate); }
 
