@@ -548,9 +548,21 @@ h1 {
 .step-t { flex: 1 1 auto; min-width: 0; }
 .step-n { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); }
 
+/* — редактор кроків у модалці цілі — */
+.sedit-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.sedit-row.se-sub { padding-left: 26px; }
+.se-mark { flex: 0 0 12px; text-align: center; color: var(--tx-5); font-size: 12px; }
+.sedit-row .se-t { padding: 6px 9px; font-size: 13px; }
+
+/* — чернетка кроку прямо в дереві цілі — */
+.step.draft .se-t { padding: 3px 8px; font-size: 12px; }
+.step.draft .ck { color: var(--tx-5); cursor: default; }
+
 /* — підписи полів у формах — */
 .lbl { flex: 0 0 132px; color: var(--tx-3); }
-.fld.grow { flex: 1 1 auto; width: auto; min-width: 0; }
+/* .grow — утиліта «займи весь простір у flex-рядку». Одне правило, одна роль:
+   працює і на інпуті, і на контейнері редактора кроків. */
+.grow { flex: 1 1 auto; width: auto; min-width: 0; }
 textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 
 /* — задача в роботі — */
@@ -850,10 +862,13 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 
       <div id="g-step-fields" class="hidden">
         <div class="row2" style="align-items:flex-start"><span class="lbl">Кроки</span>
-          <textarea class="fld grow" id="g-steps" rows="7" placeholder="Знайти постачальників&#10;  Китай&#10;  Туреччина&#10;Домовитись про ціни&#10;Завести 5 флагманів"></textarea></div>
-        <p class="set-note">Кожен рядок — крок. Рядок із <b>відступом</b> (два пробіли або Tab) стає
-          підкроком попереднього. Прогрес рахується за найдрібнішими пунктами, тож «3 з 7» завжди чесне.
-          Кроки можна додавати й потім, прямо в панелі.</p>
+          <div class="grow">
+            <div id="g-step-editor"></div>
+            <button class="mini" id="g-add-step" style="margin-top:2px">+ крок</button>
+          </div></div>
+        <p class="set-note"><b>Enter</b> — наступний крок · <b>+ підкрок</b> — вкладений пункт ·
+          порожні рядки не зберігаються. Прогрес рахується за найдрібнішими пунктами, тож «3 з 7»
+          завжди чесне. Кроки можна додавати й потім, прямо в панелі.</p>
       </div>
 
       <div class="row2"><span class="lbl">XP за досягнення</span>
@@ -1562,22 +1577,20 @@ function syncGoalDone(g) {
   return "";
 }
 
-// Кроки з тексту: рядок = крок, рядок із ВІДСТУПОМ = підкрок попереднього.
-// Правило саме про відступ, а не про дефіс: якби «-» означав підкрок, то
-// список, увесь написаний через «-», склався б у один крок із хвостом.
-function parseSteps(text) {
+// Нормалізація кроків із редактора: приймає [{title, subs:[рядки|об'єкти]}],
+// віддає повні записи з id. Порожні назви мовчки відкидаються — так редактор
+// може тримати скільки завгодно незаповнених рядків.
+function normSteps(list) {
   const out = [];
-  for (const raw of String(text || "").split("\n")) {
-    if (!raw.trim()) continue;
-    const isSub = /^(\t| {2,})/.test(raw);
-    const title = raw.replace(/^[\s]*[-–—•*]?\s*/, "").trim().slice(0, 200);
+  for (const raw of (Array.isArray(list) ? list : [])) {
+    const title = String((raw && raw.title) != null ? raw.title : raw || "").trim().slice(0, 200);
     if (!title) continue;
-    if (isSub && out.length) {
-      const parent = out[out.length - 1];
-      parent.subs.push({ id: rid("s_"), title, done: false });
-    } else {
-      out.push({ id: rid("s_"), title, done: false, subs: [] });
+    const subs = [];
+    for (const sb of ((raw && Array.isArray(raw.subs)) ? raw.subs : [])) {
+      const st = String((sb && sb.title) != null ? sb.title : sb || "").trim().slice(0, 200);
+      if (st) subs.push({ id: rid("s_"), title: st, done: false });
     }
+    out.push({ id: rid("s_"), title, done: false, subs });
   }
   return out;
 }
@@ -1599,14 +1612,15 @@ function addGoal(title, target, unit, xp, current) {
   return true;
 }
 
-function addGoalSteps(title, stepsText, xp) {
+function addGoalSteps(title, steps, xp) {
   const t = String(title || "").trim().slice(0, 200);
-  if (!t) return false;
+  const norm = normSteps(steps);
+  if (!t || !norm.length) return false;
   const goals = loadGoals();
   goals.push({
     id: rid("g_"), title: t, note: "", mode: "steps",
     target: 0, current: 0, unit: "",
-    steps: parseSteps(stepsText),
+    steps: norm,
     xp: Math.max(0, xp | 0),
     createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null
   });
@@ -2038,6 +2052,42 @@ function renderDays() {
 // Розгорнуті цілі тримаємо в пам'яті: це стан перегляду, не дані користувача.
 const _goalOpen = new Set();
 
+// Чернетка нового кроку: {goalId, parentId|null}. Рендериться інлайн-рядком
+// у самому дереві — браузерний prompt() тут виглядав як чужорідне вікно.
+let _stepDraft = null;
+function openStepDraft(goalId, parentId) {
+  _stepDraft = { goalId, parentId: parentId || null };
+  _goalOpen.add(goalId);
+  refresh("goals");
+  const i = $("step-draft-input");
+  if (i) i.focus();
+}
+function closeStepDraft() {
+  _stepDraft = null;
+  refresh("goals");
+}
+function commitStepDraft() {
+  const i = $("step-draft-input");
+  if (!i || !_stepDraft) return;
+  const t = i.value.trim();
+  if (!t) { closeStepDraft(); return; }
+  const d = _stepDraft;
+  addStep(d.goalId, t, d.parentId);   // commit() перемалює список...
+  const again = $("step-draft-input");
+  if (again) again.focus();           // ...а чернетка лишиться відкритою для наступного
+}
+function draftRow(isSub) {
+  return [
+    '<div class="step draft', (isSub ? ' substep' : ''), '">',
+    '<span class="ck">＋</span>',
+    '<input class="fld grow se-t" id="step-draft-input" placeholder="', (isSub ? 'Підкрок…' : 'Крок…'),
+    '" maxlength="200">',
+    '<button class="mini" data-sact="commit" title="Додати (Enter)">✓</button>',
+    '<button class="mini" data-sact="cancel" title="Скасувати (Esc)">✕</button>',
+    '</div>'
+  ].join("");
+}
+
 function renderGoals() {
   const goals = loadGoals().slice().sort((a, b) => (gDone(a) ? 1 : 0) - (gDone(b) ? 1 : 0) || b.createdAt - a.createdAt);
   if (!goals.length) {
@@ -2076,8 +2126,9 @@ function renderGoals() {
            '</div>');
 
     if (steps && open) {
+      const dr = (_stepDraft && _stepDraft.goalId === g.id) ? _stepDraft : null;
       h.push('<div class="steps">');
-      if (!g.steps.length) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
+      if (!g.steps.length && !dr) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
       for (const st of g.steps) {
         const hasSubs = (st.subs || []).length > 0;
         h.push(
@@ -2098,7 +2149,9 @@ function renderGoals() {
             '</div>'
           );
         }
+        if (dr && dr.parentId === st.id) h.push(draftRow(true));
       }
+      if (dr && !dr.parentId) h.push(draftRow(false));
       h.push('</div>');
     }
     h.push('</div>');
@@ -2325,7 +2378,12 @@ function reopenDayLog() {
   openDayLog(String(m.dataset.days || "").split(",").filter(Boolean), m.dataset.dif, m.dataset.label);
 }
 
-function openGoalModal() { setGoalKind(_goalKind); $("goal-modal").classList.remove("hidden"); $("g-title").focus(); }
+function openGoalModal() {
+  setGoalKind(_goalKind);
+  if (!$("g-step-editor").children.length) seReset();
+  $("goal-modal").classList.remove("hidden");
+  $("g-title").focus();
+}
 function closeGoalModal() { $("goal-modal").classList.add("hidden"); }
 
 /* ─── §13 · ОБРОБНИКИ ────────────────────────────────────────────────────── */
@@ -2367,11 +2425,12 @@ $("goal-list").addEventListener("click", e => {
   else if (act === "dec") setGoalProgress(id, (g.current | 0) - 1);
   else if (act === "reopen") reopenGoal(id);
   else if (act === "del") deleteGoal(id);
-  else if (act === "exp") { _goalOpen.has(id) ? _goalOpen.delete(id) : _goalOpen.add(id); refresh("goals"); }
-  else if (act === "addstep") {
-    const t = prompt("Новий крок:");
-    if (t) { _goalOpen.add(id); addStep(id, t, null); }
+  else if (act === "exp") {
+    if (_goalOpen.has(id)) { _goalOpen.delete(id); if (_stepDraft && _stepDraft.goalId === id) _stepDraft = null; }
+    else _goalOpen.add(id);
+    refresh("goals");
   }
+  else if (act === "addstep") openStepDraft(id, null);
 });
 
 // Кроки й підкроки — окремим делегованим обробником, щоб не плутати з діями цілі.
@@ -2384,10 +2443,21 @@ $("goal-list").addEventListener("click", e => {
   const act = btn.dataset.sact;
   if (act === "toggle") toggleStep(gid, sid);
   else if (act === "del") delStep(gid, sid);
-  else if (act === "addsub") {
-    const t = prompt("Підкрок:");
-    if (t) addStep(gid, t, sid);
-  }
+  else if (act === "addsub") openStepDraft(gid, sid);
+});
+
+// Чернетка: ✓/✕ кнопками, Enter/Esc із клавіатури. Enter лишає чернетку
+// відкритою — серію кроків можна надрукувати не торкаючись миші.
+$("goal-list").addEventListener("click", e => {
+  const btn = e.target.closest("[data-sact]");
+  if (!btn || !e.target.closest(".step.draft")) return;
+  if (btn.dataset.sact === "commit") commitStepDraft();
+  else if (btn.dataset.sact === "cancel") closeStepDraft();
+});
+$("goal-list").addEventListener("keydown", e => {
+  if (e.target.id !== "step-draft-input") return;
+  if (e.key === "Enter") { e.preventDefault(); commitStepDraft(); }
+  else if (e.key === "Escape") { e.stopPropagation(); closeStepDraft(); }
 });
 // ⚠️ change, не input: input перемальовував би список на кожній цифрі
 // й забирав фокус із поля, яке саме редагують.
@@ -2447,6 +2517,83 @@ $("import-file").addEventListener("change", e => {
   r.readAsText(f);
 });
 
+/* ── Редактор кроків у модалці нової цілі ──
+   Кожен крок — окремий рядок-інпут; підкроки — вкладені рядки. Значення живуть
+   у самих інпутах і збираються лише при збереженні: перемальовувати редактор
+   на кожну літеру означало б втрачати фокус — та сама пастка, що й у
+   налаштуваннях складностей.                                              */
+function seRow(lvl, value) {
+  const div = document.createElement("div");
+  div.className = "sedit-row" + (lvl ? " se-sub" : "");
+  div.dataset.lvl = String(lvl);
+  div.innerHTML = [
+    '<span class="se-mark">', (lvl ? "└" : "•"), '</span>',
+    '<input class="fld grow se-t" maxlength="200" placeholder="', (lvl ? "Підкрок…" : "Крок…"), '"',
+    ' value="', escAttr(value || ""), '">',
+    (lvl ? '' : '<button class="mini" data-se="sub" title="Додати підкрок">+ підкрок</button>'),
+    '<button class="mini" data-se="del" title="Прибрати рядок">✕</button>'
+  ].join("");
+  return div;
+}
+// Межа гілки: перший наступний рядок верхнього рівня (підкроки йдуть одразу за батьком).
+function seBranchEnd(row) {
+  let n = row.nextElementSibling;
+  while (n && n.dataset.lvl === "1") n = n.nextElementSibling;
+  return n;   // може бути null = кінець списку
+}
+function seFocus(row) { const i = row.querySelector(".se-t"); if (i) i.focus(); }
+
+function seReset() {
+  const ed = $("g-step-editor");
+  ed.innerHTML = "";
+  ed.appendChild(seRow(0, ""));
+}
+function seCollect() {
+  const out = [];
+  for (const row of $("g-step-editor").querySelectorAll(".sedit-row")) {
+    const title = row.querySelector(".se-t").value.trim();
+    if (!title) continue;
+    if (row.dataset.lvl === "1") { if (out.length) out[out.length - 1].subs.push(title); }
+    else out.push({ title, subs: [] });
+  }
+  return out;
+}
+
+$("g-step-editor").addEventListener("click", e => {
+  const row = e.target.closest(".sedit-row");
+  const btn = e.target.closest("[data-se]");
+  if (!row || !btn) return;
+  const ed = $("g-step-editor");
+  if (btn.dataset.se === "sub") {
+    const nr = seRow(1, "");
+    ed.insertBefore(nr, seBranchEnd(row));
+    seFocus(nr);
+  } else if (btn.dataset.se === "del") {
+    if (row.dataset.lvl === "0") {
+      // Крок забирає з собою свої підкроки — інакше вони приклеїлись би до сусіда.
+      let n = row.nextElementSibling;
+      while (n && n.dataset.lvl === "1") { const x = n; n = n.nextElementSibling; x.remove(); }
+    }
+    row.remove();
+    if (!ed.querySelector('.sedit-row[data-lvl="0"]')) ed.appendChild(seRow(0, ""));
+  }
+});
+$("g-step-editor").addEventListener("keydown", e => {
+  if (!e.target.classList.contains("se-t") || e.key !== "Enter") return;
+  e.preventDefault();
+  const row = e.target.closest(".sedit-row");
+  const lvl = +row.dataset.lvl;
+  const nr = seRow(lvl, "");
+  // Enter на кроці ставить новий крок ПІСЛЯ його підкроків, на підкроці — одразу після.
+  $("g-step-editor").insertBefore(nr, lvl ? row.nextElementSibling : seBranchEnd(row));
+  seFocus(nr);
+});
+$("g-add-step").addEventListener("click", () => {
+  const nr = seRow(0, "");
+  $("g-step-editor").appendChild(nr);
+  seFocus(nr);
+});
+
 let _goalKind = "number";
 function setGoalKind(k) {
   _goalKind = (k === "steps") ? "steps" : "number";
@@ -2466,11 +2613,11 @@ $("gk-row").addEventListener("click", e => {
 
 $("g-save").addEventListener("click", () => {
   const ok = _goalKind === "steps"
-    ? addGoalSteps($("g-title").value, $("g-steps").value, +$("g-xp").value)
+    ? addGoalSteps($("g-title").value, seCollect(), +$("g-xp").value)
     : addGoal($("g-title").value, +$("g-target").value, $("g-unit").value, +$("g-xp").value, +$("g-current").value);
   if (!ok) { $("g-title").focus(); return; }
   $("g-title").value = "";
-  $("g-steps").value = "";
+  seReset();
   closeGoalModal();
 });
 

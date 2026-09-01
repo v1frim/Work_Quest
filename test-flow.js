@@ -159,8 +159,10 @@ const SCRIPT = `(function () {
 
     // 11b. Ціль зі списком кроків і підкроків.
     localStorage.clear();
-    addGoalSteps("Розширити асортимент",
-      "Знайти постачальників\\n  Китай\\n  Туреччина\\nЗавести флагманів", 300);
+    addGoalSteps("Розширити асортимент", [
+      { title: "Знайти постачальників", subs: ["Китай", "Туреччина"] },
+      { title: "Завести флагманів", subs: [] }
+    ], 300);
     const gs = loadGoals()[0];
     ok("режим кроків", gs.mode, "steps");
     ok("кроків верхнього рівня", gs.steps.length, 2);
@@ -187,6 +189,38 @@ const SCRIPT = `(function () {
     // Крок із підкроками — перемикач усієї гілки.
     toggleStep(gs.id, gs.steps[0].id);
     ok("зняття батька зняло підкроки", goalProgress(loadGoals()[0]).cur, 0);
+
+    // 11c. Редактор кроків у модалці: рядки → структура.
+    localStorage.clear();
+    openGoalModal();
+    setGoalKind("steps");
+    document.getElementById("g-title").value = "Ціль з редактора";
+    seReset();
+    const ed = document.getElementById("g-step-editor");
+    ed.querySelector(".se-t").value = "Перший крок";
+    ed.querySelector('[data-se="sub"]').click();               // + підкрок
+    ed.querySelector('.se-sub .se-t').value = "Вкладений";
+    document.getElementById("g-add-step").click();             // + другий крок
+    ed.querySelectorAll('.sedit-row[data-lvl="0"] .se-t')[1].value = "Другий крок";
+    document.getElementById("g-save").click();
+    const ge = loadGoals()[0];
+    ok("редактор: ціль створено", !!ge, true);
+    ok("редактор: кроків", ge.steps.length, 2);
+    ok("редактор: підкрок на місці", ge.steps[0].subs[0].title, "Вкладений");
+    ok("редактор: порядок збережено", ge.steps[1].title, "Другий крок");
+
+    // 11d. Інлайн-чернетка в панелі замість prompt().
+    openStepDraft(ge.id, null);
+    document.getElementById("step-draft-input").value = "Крок із панелі";
+    commitStepDraft();
+    ok("чернетка: крок додано", loadGoals()[0].steps.length, 3);
+    ok("чернетка лишилась відкритою", !!document.getElementById("step-draft-input"), true);
+    openStepDraft(ge.id, loadGoals()[0].steps[2].id);
+    document.getElementById("step-draft-input").value = "Підкрок із панелі";
+    commitStepDraft();
+    ok("чернетка: підкрок додано", loadGoals()[0].steps[2].subs[0].title, "Підкрок із панелі");
+    closeStepDraft();
+    closeGoalModal();
 
     // 12. ⚠️ МІГРАЦІЯ РЕЄСТРУ СКЛАДНОСТЕЙ.
     // Реєстр належить користувачу, тож нова стандартна складність не може
