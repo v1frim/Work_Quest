@@ -395,7 +395,8 @@ h1 {
 }
 #xp-section:hover { background: rgba(255,209,102,0.07); }
 
-#levels-overlay, #records-overlay, #settings-overlay, #goal-modal, #day-modal {
+#levels-overlay, #records-overlay, #settings-overlay, #goal-modal, #day-modal,
+#trash-overlay {
   position: fixed; inset: 0; z-index: 300;
   display: flex; align-items: center; justify-content: center; padding: 24px;
   background: var(--scrim);
@@ -629,6 +630,22 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 .task-t { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--tx-1); }
 .task-x { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--c); }
 
+/* — кошик — */
+.trash-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 6px;
+  padding: 8px 11px; margin-bottom: 7px;
+  background: var(--solid-btn); border: var(--bd-ghost); border-left: 3px solid var(--c);
+  border-radius: var(--r-btn);
+}
+.trash-ic   { flex: 0 0 auto; font-size: 13px; }
+.trash-t    { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--tx-1); overflow-wrap: anywhere; }
+.trash-meta { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); }
+.trash-row .mini { flex: 0 0 auto; }
+/* Незворотна дія — і виглядає відповідно, щоб її не тиснули мимохідь. */
+#trash-clear { margin-top: 14px; }
+.act.danger { color: #ff8f8f; border-color: rgba(255,107,107,0.42); }
+.act.danger:hover { background: rgba(255,107,107,0.12); }
+
 /* — налаштування — */
 .set-sect { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--gold); }
 .set-note { margin: -4px 0 12px; font-size: 11px; color: var(--tx-5); line-height: 1.5; }
@@ -740,6 +757,8 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 #wq-totals.hidden        { display: none; }
 #thermo.hidden           { display: none; }
 #bottom-left-btns.hidden { display: none; }
+#trash-overlay.hidden     { display: none; }
+#trash-clear.hidden       { display: none; }
 #levels-overlay.hidden    { display: none; }
 #records-overlay.hidden   { display: none; }
 #settings-overlay.hidden  { display: none; }
@@ -844,8 +863,26 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   <button class="act" id="prog-btn">📈 Прогрес по днях</button>
   <button class="act" id="backup-btn">💾 Зробити копію</button>
   <button class="act" id="import-btn">📂 Відновити</button>
+  <button class="act" id="trash-btn">🗑 Кошик</button>
   <button class="act" id="settings-btn">⚙️ Налаштування</button>
   <input type="file" id="import-file" class="hidden" accept="application/json,.json">
+</div>
+
+<!-- ═══ ОВЕРЛЕЙ «КОШИК» ═══ -->
+<div id="trash-overlay" class="hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div>
+        <h2>🗑 Кошик</h2>
+        <span class="sh-sub">видалене лежить тут 30 днів, потім зникає остаточно</span>
+      </div>
+      <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div id="trash-list"></div>
+      <button class="act danger hidden" id="trash-clear">Спорожнити кошик остаточно</button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ ОВЕРЛЕЙ «СХОДИ РІВНІВ» ═══ -->
@@ -1142,6 +1179,72 @@ function loadTasks() { const a = loadJSON(K.tasks, []); return Array.isArray(a) 
 function saveTasks(a) { return saveJSON(K.tasks, a); }
 function loadGoals() { const a = loadJSON(K.goals, []); return Array.isArray(a) ? a : []; }
 function saveGoals(a) { return saveJSON(K.goals, a); }
+/* ── Кошик ──
+   ⚠️ Видалення — єдина дія без «скасувати»: рядок зникав із журналу назавжди.
+   Тепер видалена задача чи ціль спершу лягає сюди й живе TRASH_KEEP_DAYS днів.
+   Прибирання робиться на ЧИТАННІ, а не за таймером: браузер може бути закритий
+   місяцями, і термін, що тікає лише поки вкладка відкрита, — це не термін. */
+function pruneTrash(list) {
+  const edge = Date.now() - TRASH_KEEP_DAYS * 86400000;
+  // ⚠️ НЕ `| 0`: мітка часу не влазить у 32 біти, і побітове АБО перетворює
+  // її на відʼємне сміття — кошик порожнів би одразу після видалення.
+  const kept = list.filter(x => x && x.item && x.item.id && Number(x.deletedAt) > edge);
+  // Стеля за кількістю: найстаріші випадають першими. Сортуємо ЯВНО, а не
+  // покладаємось на порядок у масиві — бекап чи ручна правка можуть його
+  // переплутати, і тоді стеля зрізала б саме те, що треба зберегти.
+  kept.sort((a, b) => Number(a.deletedAt) - Number(b.deletedAt));
+  return kept.length > TRASH_MAX ? kept.slice(kept.length - TRASH_MAX) : kept;
+}
+function loadTrash() {
+  const a = loadJSON(K.trash, []);
+  return pruneTrash(Array.isArray(a) ? a : []);
+}
+function saveTrash(a) { return saveJSON(K.trash, pruneTrash(a)); }
+// kind: "task" | "goal". Запис із тим самим id не дублюється — інакше після
+// «видалив → відновив → видалив» у кошику лежали б дві різні версії однієї
+// задачі, і відновлення брало б навмання.
+function toTrash(kind, item) {
+  const t = loadTrash().filter(x => x.item.id !== item.id);
+  t.push({ kind, deletedAt: Date.now(), item });
+  saveTrash(t);
+}
+function restoreTrash(id) {
+  const t = loadTrash();
+  const i = t.findIndex(x => x.item.id === id);
+  if (i < 0) return false;
+  const rec = t[i];
+  if (rec.kind === "goal") {
+    const goals = loadGoals();
+    if (!goals.some(g => g.id === rec.item.id)) { goals.push(rec.item); saveGoals(goals); }
+  } else {
+    const tasks = loadTasks();
+    if (!tasks.some(x => x.id === rec.item.id)) { tasks.push(rec.item); saveTasks(tasks); }
+  }
+  t.splice(i, 1);
+  saveTrash(t);
+  sanitizeData();          // повернений запис міг бути зі старої схеми
+  commit();
+  toast("↩ повернуто · " + rec.item.title);
+  return true;
+}
+function purgeTrash(id) {
+  const t = loadTrash();
+  const i = t.findIndex(x => x.item.id === id);
+  if (i < 0) return;
+  if (!confirm("Стерти «" + t[i].item.title + "» остаточно? Це вже не відновити.")) return;
+  t.splice(i, 1);
+  saveTrash(t);
+  commit();
+}
+function clearTrash() {
+  const n = loadTrash().length;
+  if (!n) return;
+  if (!confirm("Спорожнити кошик? " + n + " " + plural(n, "запис", "записи", "записів") +
+               " зникне остаточно.")) return;
+  saveTrash([]);
+  commit();
+}
+
 function loadDifs() {
   const a = loadJSON(K.difs, null);
   if (!Array.isArray(a) || !a.length) return DEFAULT_DIFFICULTIES.map(d => Object.assign({}, d));
@@ -1321,6 +1424,10 @@ function sanitizeData() {
     }
     if (gDone(g) && !g.doneDay) { g.doneDay = dayKeyOf(g.doneAt); gf++; }
   }
+  // Кошик прибирається на кожному читанні, але записати почищене треба явно —
+  // інакше протерміноване лежало б у localStorage вічно, просто невидиме.
+  saveTrash(loadTrash());
+
   // Порядок цілей — ручний, тож у старих записів його немає: роздаємо за
   // поточним положенням у масиві. Ідемпотентно: вдруге вже нічого не змінить.
   goals.forEach((g, i) => { if (typeof g.order !== "number") { g.order = i + 1; gf++; } });
@@ -1715,8 +1822,9 @@ function deleteTask(id) {
   // ⚠️ Питаємо ЗАВЖДИ. Відкрита задача видалялась одним кліком без питання —
   // і зникала безслідно, бо кошика в застосунку ще немає.
   if (!confirm(tDone(tasks[i])
-    ? "Видалити виконану задачу «" + tasks[i].title + "»? XP за неї буде знято."
-    : "Видалити задачу «" + tasks[i].title + "»?")) return;
+    ? "Видалити виконану задачу «" + tasks[i].title + "»? XP за неї буде знято.\nЗапис ляже в кошик."
+    : "Видалити задачу «" + tasks[i].title + "»?\nЗапис ляже в кошик.")) return;
+  toTrash("task", tasks[i]);
   tasks.splice(i, 1);
   saveTasks(tasks);
   commit();
@@ -1993,7 +2101,10 @@ function deleteGoal(id) {
   const goals = loadGoals();
   const i = goals.findIndex(x => x.id === id);
   if (i < 0) return;
-  if (!confirm("Видалити ціль" + (gDone(goals[i]) ? "? XP за неї буде знято." : "?"))) return;
+  if (!confirm("Видалити ціль «" + goals[i].title + "»" +
+               (gDone(goals[i]) ? "? XP за неї буде знято." : "?") +
+               "\nЗапис ляже в кошик.")) return;
+  toTrash("goal", goals[i]);
   goals.splice(i, 1);
   saveGoals(goals);
   commit();
@@ -2129,7 +2240,8 @@ const RENDER = {
   totals: renderTotals,
   days:   renderDays,
   goals:  renderGoals,
-  open:   renderOpen
+  open:   renderOpen,
+  trash:  renderTrash
 };
 function refresh(...zones) {
   for (const n of (zones.length ? zones : Object.keys(RENDER))) RENDER[n]();
@@ -2611,6 +2723,43 @@ function renderOpen() {
   }
   $("open-list").innerHTML = h.join("");
 }
+
+// Кошик. Малюється й коли оверлей закритий — лічильник на кнопці має бути
+// свіжим, інакше «3» висіла б після спорожнення до перезавантаження.
+function renderTrash() {
+  const t = loadTrash().slice().reverse();          // свіже — згори
+  $("trash-btn").textContent = t.length ? "🗑 Кошик · " + t.length : "🗑 Кошик";
+  $("trash-clear").classList.toggle("hidden", !t.length);
+  if (!t.length) {
+    $("trash-list").innerHTML = '<div class="empty">Кошик порожній. Сюди на ' +
+      TRASH_KEEP_DAYS + ' днів потрапляє все, що ти видалив.</div>';
+    return;
+  }
+  const today = dayNum(todayKey());
+  const h = [];
+  for (const r of t) {
+    const days = Math.max(0, today - dayNum(dayKeyOf(r.deletedAt)));
+    const left = Math.max(0, TRASH_KEEP_DAYS - days);
+    const isGoal = r.kind === "goal";
+    const dif = isGoal ? null : getDif(r.item.difficultyId);
+    h.push(
+      '<div class="trash-row" data-trash="', escAttr(r.item.id), '"',
+      (dif ? ' style="--c:' + dif.color + '"' : ' style="--c:var(--gold)"'), '>',
+      '<span class="trash-ic">', (isGoal ? '🎯' : '📋'), '</span>',
+      '<span class="trash-t">', esc(r.item.title), '</span>',
+      '<span class="trash-meta">',
+      (days === 0 ? 'сьогодні' : days + ' ' + plural(days, "день", "дні", "днів") + ' тому'),
+      ' · лишилось ', left, ' ', plural(left, "день", "дні", "днів"),
+      '</span>',
+      '<button class="mini" data-tract="restore" title="Повернути в застосунок">↩</button>',
+      '<button class="mini dz" data-tract="purge" title="Стерти остаточно">✕</button>',
+      '</div>'
+    );
+  }
+  $("trash-list").innerHTML = h.join("");
+}
+function openTrash() { $("trash-overlay").classList.remove("hidden"); }
+function closeTrash() { $("trash-overlay").classList.add("hidden"); }
 
 /* ─── §11 · НАЛАШТУВАННЯ ────────────────────────────────────────────────── */
 function renderSettings() {
@@ -3249,7 +3398,18 @@ $("records-overlay").addEventListener("click", e => {
 });
 addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
-  closeLevels(); closeRecords(); closeSettings(); closeGoalModal(); closeDayLog();
+  closeLevels(); closeRecords(); closeSettings(); closeGoalModal(); closeDayLog(); closeTrash();
+});
+
+$("trash-btn").addEventListener("click", openTrash);
+$("trash-clear").addEventListener("click", clearTrash);
+$("trash-overlay").addEventListener("click", e => {
+  if (e.target === $("trash-overlay") || e.target.closest('[data-act="close"]')) { closeTrash(); return; }
+  const row = e.target.closest("[data-trash]");
+  const btn = e.target.closest("[data-tract]");
+  if (!row || !btn) return;
+  if (btn.dataset.tract === "restore") restoreTrash(row.dataset.trash);
+  else if (btn.dataset.tract === "purge") purgeTrash(row.dataset.trash);
 });
 
 $("prog-btn").addEventListener("click", () => {

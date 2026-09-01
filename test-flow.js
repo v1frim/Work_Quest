@@ -489,7 +489,63 @@ const SCRIPT = `(function () {
     ok("стрілка в задачі зʼявилась після кроку",
        document.querySelector('[data-task="' + bareT + '"] [data-tact="exp"]') !== null, true);
 
-    // 18. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
+    // 18. Кошик: видалене можна повернути, і воно живе рівно 30 днів.
+    localStorage.clear();
+    addDone("Виконана задача", activeDifs()[2].id);
+    const doneXp = S().xp.total;
+    const delId = loadTasks()[0].id;
+    deleteTask(delId);
+    ok("задача пішла з журналу", loadTasks().length, 0);
+    ok("XP знявся разом із нею", S().xp.total, 0);
+    ok("задача лягла в кошик", loadTrash().length, 1);
+    ok("кошик памʼятає тип", loadTrash()[0].kind, "task");
+    ok("лічильник на кнопці", document.getElementById("trash-btn").textContent, "🗑 Кошик · 1");
+    document.getElementById("trash-overlay")
+      .querySelector('[data-trash="' + delId + '"] [data-tract="restore"]').click();
+    ok("задача повернулась", loadTasks().length, 1);
+    ok("XP повернувся рівно той самий", S().xp.total, doneXp);
+    ok("кошик спорожнів", loadTrash().length, 0);
+    ok("лічильник зник", document.getElementById("trash-btn").textContent, "🗑 Кошик");
+
+    // Ціль теж відновлюється — з кроками й порядком.
+    addGoalSteps("Ціль у кошику", [{ title: "Крок", subs: ["п1"] }], 400);
+    const gDel = loadGoals()[0].id;
+    deleteGoal(gDel);
+    ok("ціль у кошику", loadTrash()[0].kind, "goal");
+    restoreTrash(gDel);
+    ok("ціль повернулась", loadGoals().length, 1);
+    ok("кроки цілі вціліли", loadGoals()[0].steps[0].subs.length, 1);
+
+    // ⚠️ Термін рахується на ЧИТАННІ, а не за таймером у вкладці.
+    localStorage.clear();
+    const day = 86400000;
+    const fresh = { kind: "task", deletedAt: Date.now() - 29 * day, item: { id: "t_fresh", title: "Свіже" } };
+    const stale = { kind: "task", deletedAt: Date.now() - 31 * day, item: { id: "t_stale", title: "Протерміноване" } };
+    localStorage.setItem("workquest_trash_v1", JSON.stringify([stale, fresh]));
+    ok("протерміноване не читається", loadTrash().length, 1);
+    ok("лишилось саме свіже", loadTrash()[0].item.id, "t_fresh");
+    sanitizeData();
+    ok("протерміноване стерто зі сховища",
+       JSON.parse(localStorage.getItem("workquest_trash_v1")).length, 1);
+    ok("протерміноване не відновлюється", restoreTrash("t_stale"), false);
+
+    // Стеля за кількістю: кошик не має права з'їсти квоту сховища.
+    localStorage.clear();
+    const many = [];
+    for (let i = 0; i < TRASH_MAX + 25; i++) many.push({ kind: "task", deletedAt: Date.now() - i * 1000, item: { id: "t_" + i, title: "з" + i } });
+    saveTrash(many);
+    ok("кошик обрізано до стелі", loadTrash().length, TRASH_MAX);
+    ok("випали найстаріші, а не перші-ліпші", loadTrash()[0].item.id, "t_199");
+    ok("найновіше на місці", loadTrash()[TRASH_MAX - 1].item.id, "t_0");
+
+    // Повторне видалення того самого id не плодить дублів.
+    localStorage.clear();
+    addOpen("Туди-сюди", activeDifs()[0].id);
+    const rid2 = loadTasks()[0].id;
+    deleteTask(rid2); restoreTrash(rid2); deleteTask(rid2);
+    ok("у кошику один запис", loadTrash().length, 1);
+
+    // 19. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
     // Це саме та регресія, яку не видно в жодному числі, крім координат:
     // до фіксу висота сітки росла й вертикальне центрування зсувало все вгору.
     localStorage.clear();
