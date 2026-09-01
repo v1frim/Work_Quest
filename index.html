@@ -197,7 +197,7 @@ html[data-tod="evening"] body {
   width: var(--w-left);
   max-height: calc(100vh - 2 * var(--pad-page));
 }
-#records-panel {
+#open-panel {
   display: flex;
   flex-direction: column;
   width: var(--w-right);
@@ -299,23 +299,6 @@ h1 {
 
 .hint { font-size: 11px; color: var(--tx-6); text-align: center; margin-top: 10px; }
 
-/* — чипси-рутини — */
-.tpl-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; justify-content: center; }
-.tpl {
-  font-size: 12px; font-family: inherit; color: var(--tx-3); cursor: pointer;
-  background: var(--solid-btn); border: var(--bd-ghost); border-radius: var(--r-pill);
-  padding: 5px 11px; transition: color var(--t-fast) ease, border-color var(--t-fast) ease;
-}
-.tpl:hover { color: var(--gold); border-color: rgba(255,209,102,0.4); }
-
-/* — секційний роздільник — */
-.sect {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 10px; letter-spacing: 2px; color: var(--tx-6);
-  margin: 20px 0 12px;
-}
-.sect::before, .sect::after { content: ""; flex: 1 1 auto; height: 1px; background: rgba(255,255,255,0.1); }
-
 /* ═══════════════════════════════════════════════════════════════════════════
    E. FIXED-ОСТРОВИ
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -374,6 +357,99 @@ h1 {
 }
 .act:hover { background: var(--solid-btn-hov); color: var(--gold); }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   E2. ОВЕРЛЕЙ «СХОДИ РІВНІВ»
+   Клік по XP-блоку відкриває повний список 100 рівнів, згрупованих по лігах.
+   ⚠️ Кольори лiг рахує hexToRgba() з реєстру LEAGUES, а не color-mix():
+   color-mix вимагає Chrome 111+, а тінт нам потрібен і як фон, і як межа, і як
+   сяйво — простіше й надійніше порахувати три rgba один раз при рендері.
+   ═══════════════════════════════════════════════════════════════════════════ */
+#xp-section {
+  cursor: pointer; border-radius: var(--r-btn);
+  padding: 6px 8px; margin: -6px -8px 14px;
+  transition: background-color var(--t-fast) ease;
+}
+#xp-section:hover { background: rgba(255,209,102,0.07); }
+
+#levels-overlay, #records-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: var(--scrim);
+}
+
+.sheet {
+  width: 640px; max-width: 96vw; height: 86vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface-sheet);
+  border: 1px solid rgba(255,209,102,0.32);
+  border-radius: var(--r-card);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,209,102,0.14);
+}
+.sheet-head {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  padding: 16px 22px; border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.sheet-head h2 { margin: 0; font-size: 19px; font-weight: 700; color: var(--gold); }
+.sheet-head .sh-sub { font-size: 12px; color: var(--tx-4); }
+.sheet-close {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: var(--tx-4); font-size: 22px; line-height: 1; padding: 2px 6px;
+  transition: color var(--t-fast) ease;
+}
+.sheet-close:hover { color: var(--tx); }
+.sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px 22px 24px; }
+
+/* — чипси періодів (оверлей рекордів) — */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.chip-btn {
+  font-size: 12px; font-family: inherit; color: var(--tx-3); cursor: pointer;
+  background: var(--solid-btn); border: var(--bd-ghost); border-radius: var(--r-pill);
+  padding: 6px 13px;
+  transition: color var(--t-fast) ease, border-color var(--t-fast) ease, background-color var(--t-fast) ease;
+}
+.chip-btn:hover { color: var(--gold); border-color: rgba(255,209,102,0.4); }
+.chip-btn.on {
+  color: var(--on-gold); font-weight: 700;
+  background: var(--grad-gold); border-color: transparent; box-shadow: var(--sh-glow);
+}
+
+/* — заголовок ліги — */
+.lg-head {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 18px 0 8px; padding-bottom: 6px;
+  font-size: 14px; font-weight: 800; letter-spacing: 0.6px;
+  color: var(--lg); border-bottom: 1px solid var(--lg-b);
+}
+.lg-head:first-child { margin-top: 0; }
+.lg-range { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--tx-5); letter-spacing: 0; }
+
+/* — рядок рівня — */
+.lvl-list { display: flex; flex-direction: column; gap: 6px; }
+.lvl-row {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  border: 1px solid var(--lg-b); border-left: 4px solid var(--lg);
+  border-radius: var(--r-btn);
+  background: linear-gradient(90deg, var(--lg-t), rgba(255,255,255,0.015));
+}
+.lvl-row.future { opacity: 0.42; }
+.lvl-row.cur {
+  opacity: 1; border-color: var(--lg2);
+  background: linear-gradient(90deg, var(--lg-s), var(--lg-t));
+  box-shadow: 0 0 22px var(--lg-g);
+}
+.lvl-num {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: var(--on-gold);
+  background: radial-gradient(circle at 35% 30%, var(--lg2), var(--lg));
+  box-shadow: 0 0 10px var(--lg-g);
+}
+.lvl-ic   { flex: 0 0 auto; font-size: 18px; }
+.lvl-name { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 700; color: var(--tx-1); }
+.lvl-you  { display: block; margin-top: 1px; font-size: 11px; font-weight: 600; color: var(--lg2); }
+.lvl-xp   { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--tx-3); white-space: nowrap; }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    F. ⚠️ ПАРНІ ПРАВИЛА .hidden — БЛОК ОБОВ'ЯЗКОВИЙ
    .hidden має специфічність (0,0,1,0), тож будь-яке правило з ID, що задає
@@ -382,10 +458,13 @@ h1 {
    ═══════════════════════════════════════════════════════════════════════════ */
 .hidden { display: none !important; }
 #progress-panel.hidden   { display: none; }
-#records-panel.hidden    { display: none; }
+#open-panel.hidden    { display: none; }
 #wq-totals.hidden        { display: none; }
 #thermo.hidden           { display: none; }
 #bottom-left-btns.hidden { display: none; }
+#levels-overlay.hidden    { display: none; }
+#records-overlay.hidden   { display: none; }
+#open-panel.hidden        { display: none; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    G. ЗАПОБІЖНИК ДЛЯ ВУЗЬКИХ ЕКРАНІВ
@@ -395,8 +474,8 @@ h1 {
 @media (max-width: 900px) {
   body { padding: 12px; align-items: flex-start; }
   .layout { gap: 14px; }
-  .card, #progress-panel, #records-panel { width: 100%; max-width: 560px; }
-  #progress-panel, #records-panel { max-height: none; }
+  .card, #progress-panel, #open-panel { width: 100%; max-width: 560px; }
+  #progress-panel, #open-panel { max-height: none; }
   #thermo { display: none; }
   #wq-totals { position: static; width: 100%; max-width: 560px; margin: 14px auto 0; }
   #bottom-left-btns { position: static; width: 100%; max-width: 560px; margin: 10px auto 0; }
@@ -426,32 +505,29 @@ h1 {
 
     <div class="today-row" id="today-row"></div>
 
-    <div class="xp-wrap">
+    <div class="xp-wrap" id="xp-section" title="Показати сходи рівнів">
       <div class="xp-row">
         <div class="xp-hex" id="xp-hex">1</div>
         <div class="xp-meta">
-          <div class="xp-name" id="xp-name">НОВАЧОК</div>
-          <div class="xp-nums" id="xp-nums">0 / 40 XP</div>
+          <div class="xp-name" id="xp-name"></div>
+          <div class="xp-nums" id="xp-nums"></div>
         </div>
       </div>
       <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
-      <div class="xp-league" id="xp-league">🌱 ЛІГА НОВАЧКА</div>
+      <div class="xp-league" id="xp-league"></div>
     </div>
 
     <p class="ask" id="ask-label">ЩО ЗРОБИВ?</p>
     <input class="field" id="task-input" type="text" placeholder="Назва задачі…" autocomplete="off">
     <div class="dif-row" id="dif-row"></div>
     <p class="hint" id="add-hint"></p>
-
-    <div class="sect">ШВИДКІ РУТИНИ</div>
-    <div class="tpl-row" id="tpl-row"></div>
   </main>
 
-  <!-- ПРАВА: рекорди -->
-  <aside class="panel" id="records-panel">
-    <div class="panel-h">🏆 Рекорди</div>
-    <div class="panel-sub" id="rec-sub">Рекорди за період · останні 30 днів</div>
-    <div class="scroll" id="rec-list"></div>
+  <!-- ПРАВА: поточні задачі (рішення сесії 1 — рекорди переїхали в оверлей) -->
+  <aside class="panel" id="open-panel">
+    <div class="panel-h" id="open-h">📋 Поточні задачі</div>
+    <div class="panel-sub">Те, що в роботі й ще не закрито</div>
+    <div class="scroll" id="open-list"></div>
   </aside>
 
 </div>
@@ -471,9 +547,41 @@ h1 {
 
 <div id="bottom-left-btns">
   <button class="act" id="prog-btn">📈 Прогрес по днях</button>
+  <button class="act" id="records-btn">🏆 Рекорди</button>
   <button class="act" id="backup-btn">💾 Зробити копію</button>
   <button class="act" id="import-btn">📂 Відновити</button>
   <button class="act" id="settings-btn">⚙️ Налаштування</button>
+</div>
+
+<!-- ═══ ОВЕРЛЕЙ «СХОДИ РІВНІВ» ═══ -->
+<div id="levels-overlay" class="hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div>
+        <h2>🪜 Сходи рівнів</h2>
+        <span class="sh-sub" id="lvl-sub"></span>
+      </div>
+      <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
+    </div>
+    <div class="sheet-body" id="lvl-body"></div>
+  </div>
+</div>
+
+<!-- ═══ ОВЕРЛЕЙ «РЕКОРДИ» ═══ -->
+<div id="records-overlay" class="hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div>
+        <h2>🏆 Рекорди</h2>
+        <span class="sh-sub">особисті максимуми</span>
+      </div>
+      <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="chips" id="rec-chips"></div>
+      <div id="rec-list"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
@@ -566,6 +674,35 @@ const WQ_KEYS = {
 const K = Object.fromEntries(Object.entries(WQ_KEYS).map(([n, d]) => [n, d.key]));
 const BACKUP_KEYS = Object.values(WQ_KEYS).map(d => d.key);
 
+/* ⚠️ Порожній catch заборонений: він маскує TDZ як «дані зникли». Скрізь логуємо. */
+function lsGet(key, def) {
+  try { const v = localStorage.getItem(key); return v === null ? def : v; }
+  catch (e) { console.error("[storage] getItem " + key, e); return def; }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(key, val); return true; }
+  catch (e) {
+    console.error("[storage] setItem " + key, e && e.name);
+    // Гучно, а не тихо: мовчазний catch тут = мовчазна втрата даних користувача.
+    if (e && (e.name === "QuotaExceededError" || e.code === 22)) alert(WQ_TEXT.errQuota);
+    return false;
+  }
+}
+function loadJSON(key, def) {
+  const raw = lsGet(key, null);
+  if (raw === null) return def;
+  try { const v = JSON.parse(raw); return v === null ? def : v; }
+  catch (e) { console.error("[storage] битий JSON у " + key, e); return def; }
+}
+function loadTasks() { const a = loadJSON(K.tasks, []); return Array.isArray(a) ? a : []; }
+
+/* ⚠️ ЄДИНЕ джерело XP у проєкті — сума ЗАМОРОЖЕНИХ xpAwarded.
+   Ключа workquest_xp_v1 не існує і не має існувати: інакше зміна XP у реєстрі
+   складностей заднім числом переписала б усю історію. */
+function totalXp() {
+  return loadTasks().reduce((s, t) => s + (typeof t.xpAwarded === "number" ? t.xpAwarded : 0), 0);
+}
+
 /* ─── §2 · ДРІБНІ ХЕЛПЕРИ ───────────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
 
@@ -586,20 +723,66 @@ function hexToRgba(hex, a) {
   return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
 }
 
+/* ─── §5 · РІВНІ ────────────────────────────────────────────────────────────
+   Рівень НІКОЛИ не зберігається — завжди обчислюється з xp.total. Саме тому
+   криву LEVELS можна перекалібрувати будь-коли без міграції даних.          */
+
+// Кожна ліга — 10 рівнів, тож рівень усередині ліги отримує римський номер:
+// «Новачок I» … «Новачок X», далі «Підмайстер I». Так у кожного зі 100 рівнів
+// є власне ім'я, і при цьому не треба вигадувати 100 назв.
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+const PER_LEAGUE = Math.max(1, Math.round(LEVELS.length / LEAGUES.length));
+
+function leagueOf(n) { return LEAGUES[Math.min(LEAGUES.length - 1, Math.floor((n - 1) / PER_LEAGUE))]; }
+function levelName(n) { return leagueOf(n).name + " " + (ROMAN[(n - 1) % PER_LEAGUE] || ""); }
+
+// Розряди — вузьким нерозривним пробілом: 252 000 не переноситься і не злипається.
+function fmtXpNum(n) { return String(n | 0).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f"); }
+
+function getLevelInfo(xp) {
+  let i = 0;
+  for (let k = LEVELS.length - 1; k >= 0; k--) { if (xp >= LEVELS[k]) { i = k; break; } }
+  const isMax = i === LEVELS.length - 1;
+  const cur = LEVELS[i];
+  const next = isMax ? cur : LEVELS[i + 1];
+  // ⚠️ На максимальному рівні pct = 100 ЯВНО. Формула дала б 0/0 = NaN,
+  // а `width: NaN%` — це смужка, що зникає рівно в момент найбільшого досягнення.
+  const pct = isMax ? 100 : Math.max(0, Math.min(100, ((xp - cur) / (next - cur)) * 100));
+  return {
+    n: i + 1, name: levelName(i + 1), league: leagueOf(i + 1),
+    xp, cur, next, isMax, pct,
+    xpInLevel: xp - cur, xpToNext: isMax ? 0 : next - xp
+  };
+}
+
 /* ─── §10 · РЕНДЕР ──────────────────────────────────────────────────────────
    ⚠️ Реєстр зон. Додав панель → дописав СЮДИ, а не в обробники. У еталоні
    панель тихо не оновлювалась, бо в одному з обробників забули рядок.
    Етап 0 малює статичний каркас із реєстрів; дані з'являться на етапі 1.   */
 const RENDER = {
   today:  renderToday,
+  xp:     renderXp,
   difs:   renderDifRow,
-  tpl:    renderTemplates,
   totals: renderTotals,
   days:   renderDays,
-  records: renderRecords
+  open:   renderOpen
 };
 function refresh(...zones) {
   for (const n of (zones.length ? zones : Object.keys(RENDER))) RENDER[n]();
+}
+
+function renderXp() {
+  const info = getLevelInfo(totalXp());
+  const hex = $("xp-hex");
+  hex.textContent = info.n;
+  hex.style.setProperty("--lvl", info.league.color);
+  hex.style.setProperty("--lvl2", info.league.color2);
+  $("xp-name").textContent = info.name.toUpperCase();
+  $("xp-nums").textContent = info.isMax
+    ? fmtXpNum(info.xp) + " XP · максимум"
+    : fmtXpNum(info.xp) + " / " + fmtXpNum(info.next) + " XP";
+  $("xp-fill").style.width = info.pct + "%";
+  $("xp-league").textContent = info.league.icon + " ЛІГА · " + info.league.name.toUpperCase();
 }
 
 function renderToday() {
@@ -632,12 +815,6 @@ function renderDifRow() {
   $("dif-row").innerHTML = h.join("");
 }
 
-function renderTemplates() {
-  const h = [];
-  for (const t of TASK_TEMPLATES) h.push('<button class="tpl">', esc(t.title), '</button>');
-  $("tpl-row").innerHTML = h.join("");
-}
-
 function renderTotals() {
   const rows = [
     ["✅", "Задач виконано", "0"],
@@ -656,8 +833,17 @@ function renderTotals() {
   $("tot-list").innerHTML = h.join("");
 }
 
-function renderDays()    { $("prog-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.days) + '</div>'; }
-function renderRecords() { $("rec-list").innerHTML  = '<div class="empty">' + esc(EMPTY_STATES.records) + '</div>'; }
+function renderDays() { $("prog-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.days) + '</div>'; }
+
+// Права колонка — задачі, які ще в роботі. Заголовок несе лічильник, щоб
+// колонка не читалась як список боргів: число видно, докору немає.
+function renderOpen() {
+  const open = loadTasks().filter(t => !(typeof t.doneAt === "number" && t.doneAt > 0));
+  $("open-h").textContent = "📋 Поточні задачі" + (open.length ? " · " + open.length : "");
+  $("open-list").innerHTML = open.length
+    ? ""
+    : '<div class="empty">' + esc(EMPTY_STATES.open) + '</div>';
+}
 
 /* ─── §11 · РОЗКЛАДКА ТА ІНІЦІАЛІЗАЦІЯ ───────────────────────────────────── */
 // Компенсація зсуву: коли обидві бічні панелі видимі, ліва (440) ширша за
@@ -666,11 +852,102 @@ function updateLayoutAlign() {
   const layout = document.querySelector(".layout");
   if (!layout) return;
   const progHidden = $("progress-panel").classList.contains("hidden");
-  const recVisible = !$("records-panel").classList.contains("hidden");
-  layout.classList.toggle("shift-right", recVisible && progHidden);
-  layout.classList.toggle("balance-center", recVisible && !progHidden);
+  const rightVisible = !$("open-panel").classList.contains("hidden");
+  layout.classList.toggle("shift-right", rightVisible && progHidden);
+  layout.classList.toggle("balance-center", rightVisible && !progHidden);
 }
 addEventListener("resize", () => requestAnimationFrame(updateLayoutAlign));
+
+/* ── Оверлей «Сходи рівнів» ──
+   Клік по XP-блоку відкриває всі 100 рівнів: згори максимум, знизу перший —
+   як на сходах. Рівні згруповані по лігах, колір ліги фарбує бейдж, межу
+   й сяйво рядка. Поточний рівень підсвічений і в нього скролиться список. */
+function openLevels() {
+  const info = getLevelInfo(totalXp());
+
+  $("lvl-sub").textContent = LEVELS.length + " рівнів · " + LEAGUES.length + " ліг · зараз "
+    + info.name + (info.isMax ? "" : " · до наступного " + fmtXpNum(info.xpToNext) + " XP");
+
+  // ⚠️ Збірка ТІЛЬКИ масивом і .join(""). Ланцюжок через '+' ламається від
+  // коментаря в кінці рядка: '+' з'їдається, і половина списку тихо зникає.
+  const h = ['<div class="lvl-list">'];
+
+  for (let li = LEAGUES.length - 1; li >= 0; li--) {
+    const lg = LEAGUES[li];
+    const from = li * PER_LEAGUE + 1;
+    const to = Math.min(LEVELS.length, from + PER_LEAGUE - 1);
+
+    h.push(
+      '<div class="lg-head" style="--lg:', lg.color, ';--lg-b:', hexToRgba(lg.color, 0.35), '">',
+      lg.icon, ' ', esc(lg.name),
+      '<span class="lg-range">рівні ', from, '–', to, ' · від ', fmtXpNum(LEVELS[from - 1]), ' XP</span>',
+      '</div>'
+    );
+
+    for (let n = to; n >= from; n--) {
+      const cls = 'lvl-row' + (n === info.n ? ' cur' : (n > info.n ? ' future' : ''));
+      const st = [
+        '--lg:', lg.color,
+        ';--lg2:', lg.color2,
+        ';--lg-t:', hexToRgba(lg.color, 0.10),
+        ';--lg-s:', hexToRgba(lg.color, 0.26),
+        ';--lg-b:', hexToRgba(lg.color, 0.42),
+        ';--lg-g:', hexToRgba(lg.color, 0.38)
+      ].join('');
+      h.push(
+        '<div class="', cls, '" style="', st, '">',
+        '<span class="lvl-num">', n, '</span>',
+        '<span class="lvl-ic">', lg.icon, '</span>',
+        '<span class="lvl-name">', esc(levelName(n)),
+        (n === info.n ? '<span class="lvl-you">ти тут · ' + fmtXpNum(info.xp) + ' XP</span>' : ''),
+        '</span>',
+        '<span class="lvl-xp">', fmtXpNum(LEVELS[n - 1]), ' XP</span>',
+        '</div>'
+      );
+    }
+  }
+  h.push('</div>');
+
+  $("lvl-body").innerHTML = h.join("");
+  $("levels-overlay").classList.remove("hidden");
+
+  const cur = $("lvl-body").querySelector(".lvl-row.cur");
+  if (cur) cur.scrollIntoView({ block: "center" });
+}
+function closeLevels() { $("levels-overlay").classList.add("hidden"); }
+
+$("xp-section").addEventListener("click", openLevels);
+$("levels-overlay").addEventListener("click", e => {
+  // Закриття по кліку на затемнення або на ✕ — без окремих обробників на кожен.
+  if (e.target === $("levels-overlay") || e.target.closest('[data-act="close"]')) closeLevels();
+});
+addEventListener("keydown", e => { if (e.key === "Escape") { closeLevels(); closeRecords(); } });
+
+/* ── Оверлей «Рекорди» ──
+   Рішення сесії 1: рекорди живуть окремим оверлеєм, а права колонка віддана
+   поточним задачам. Чипси періодів працюють уже зараз (обраний період
+   зберігається); самі рекорди наповняться, коли з'явиться S() і історія. */
+function renderRecChips() {
+  const cur = lsGet(K.recPeriod, DEFAULT_PERIOD);
+  const h = [];
+  for (const p of PERIODS) {
+    h.push('<button class="chip-btn', (p.id === cur ? ' on' : ''), '" data-period="', esc(p.id), '">',
+           esc(p.label), '</button>');
+  }
+  $("rec-chips").innerHTML = h.join("");
+  $("rec-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.records) + '</div>';
+}
+function openRecords() { renderRecChips(); $("records-overlay").classList.remove("hidden"); }
+function closeRecords() { $("records-overlay").classList.add("hidden"); }
+
+$("records-btn").addEventListener("click", openRecords);
+$("records-overlay").addEventListener("click", e => {
+  if (e.target === $("records-overlay") || e.target.closest('[data-act="close"]')) { closeRecords(); return; }
+  const chip = e.target.closest("[data-period]");
+  if (!chip) return;
+  lsSet(K.recPeriod, chip.dataset.period);
+  renderRecChips();
+});
 
 function init() {
   $("app-title").textContent = WQ_TEXT.appTitle;
@@ -678,12 +955,6 @@ function init() {
   $("ask-label").textContent = WQ_TEXT.askDone.toUpperCase();
   $("add-hint").textContent  = WQ_TEXT.addHint;
   $("th-goal").textContent   = DEFAULT_PLAN.perDay + " з.";
-  $("xp-nums").textContent   = "0 / " + LEVELS[1] + " XP";
-  $("xp-name").textContent   = LEAGUES[0].name.toUpperCase();
-  $("xp-league").textContent = LEAGUES[0].icon + " ЛІГА · " + LEAGUES[0].name.toUpperCase();
-  $("xp-hex").style.setProperty("--lvl",  LEAGUES[0].color);
-  $("xp-hex").style.setProperty("--lvl2", LEAGUES[0].color2);
-  $("rec-sub").textContent = WQ_TEXT.recPeriod + " · останні 30 днів";
 
   if (!LS_OK) console.warn(WQ_TEXT.errPrivate);
 
