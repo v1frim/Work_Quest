@@ -71,19 +71,18 @@
   /* — радіуси — */
   --r-card: 20px; --r-box: 14px; --r-btn: 12px; --r-sm: 8px; --r-pill: 999px;
 
-  /* — геометрія. Усі три колонки однакової ширини (рішення користувача).
-       ⚠️ Розійдуться ширини → перерахуй --balance (= --w-left − --w-right)
+  /* — геометрія. ⚠️ Міняєш --w-left → перерахуй --balance (= --w-left − --w-right)
        і --shift (= (--w-left + --gap-col) / 2), інакше центральна картка
-       з'їде вбік, коли одну з панелей сховано. — */
+       з'їде вбік. — */
   --gap-col:   24px;
   --pad-page:  20px;
   --pad-card:  30px 32px;
   --pad-panel: 20px 20px;
   --w-card:    460px;
-  --w-left:    460px;
-  --w-right:   460px;
-  --balance:   0px;
-  --shift:     242px;
+  --w-left:    440px;
+  --w-right:   420px;
+  --balance:   20px;
+  --shift:     222px;
   --fix-inset: 18px;
 
   /* — час — */
@@ -166,17 +165,19 @@ html[data-tod="evening"] body {
    ═══════════════════════════════════════════════════════════════════════════ */
 /* opacity:0 доки лейаут не зібрано: інакше на hard-reload видно картку саму,
    а панелі «спалахують» поруч. Клас .ready ставить ініт + fallback на load. */
-/* ⚠️ Висота розкладки СТАЛА — рівно у viewport. Інакше кожне розгортання
-   цілі змінювало б висоту колонки, а вертикальне центрування зсувало б УСЮ
-   сторінку вгору-вниз: панель «падала» на очах. Тепер зростає лише внутрішній
-   скрол панелі, а сама сітка не рухається жодного разу. */
+/* ⚠️ Висоту рядка задає ЦЕНТРАЛЬНА картка, бічні панелі під неї
+   розтягуються (align-items: stretch). Панелі при цьому НЕ впливають на
+   висоту самі: їхній список лежить в абсолютно позиційованому .scroll
+   (див. .scroll-wrap), тож скільки б цілей не розгорнулось, сітка не
+   ворухнеться. Без цього вертикальне центрування зсувало б УСЮ сторінку
+   вгору-вниз при кожному розгортанні — панель «падала» на очах. */
 .layout {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   flex-wrap: wrap;
   gap: var(--gap-col);
-  height: calc(100vh - 2 * var(--pad-page));
+  max-height: calc(100vh - 2 * var(--pad-page));
   opacity: 0;
   transition: opacity 0.25s ease;
 }
@@ -199,21 +200,18 @@ html[data-tod="evening"] body {
 .card  { width: var(--w-card); padding: var(--pad-card); }
 .panel { padding: var(--pad-panel); }
 
-/* Бічні колонки — на всю висоту сітки; усе зростання йде у внутрішній .scroll. */
-#progress-panel {
-  display: flex;
-  flex-direction: column;
-  width: var(--w-left);
-  height: 100%;
-}
-#open-panel {
-  display: flex;
-  flex-direction: column;
-  width: var(--w-right);
-  height: 100%;
-}
-/* Картка лишається за розміром вмісту й центрується, але не вилазить за екран. */
-.card { max-height: 100%; overflow-y: auto; }
+/* Бічні колонки. Власної висоти майже не мають (список абсолютний) —
+   рівно тому вони й приймають висоту центральної картки. */
+#progress-panel { width: var(--w-left); }
+#open-panel     { width: var(--w-right); }
+.panel { display: flex; flex-direction: column; min-height: 0; }
+/* ⚠️ Обгортка зі скролом: position:relative + абсолютний .scroll усередині.
+   Саме це прибирає вміст панелі з розрахунку висоти рядка. Прибереш
+   абсолют — довгий список знову почне розпирати сітку. */
+.scroll-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
+.scroll-wrap > .scroll { position: absolute; inset: 0; }
+/* Картка лишається за розміром вмісту, але не вилазить за екран. */
+.card { max-height: calc(100vh - 2 * var(--pad-page)); overflow-y: auto; }
 
 .panel-h  { font-size: 17px; font-weight: 700; color: var(--gold); margin: 0 0 2px; }
 .panel-sub{ font-size: 12px; color: var(--tx-4); margin: 0 0 14px; }
@@ -617,8 +615,11 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   background: var(--solid-btn); border: var(--bd-ghost); border-left: 3px solid var(--c);
   border-radius: var(--r-btn);
 }
-/* Сам рядок задачі. Обгортка потрібна, бо під ним тепер живе дерево кроків. */
-.task-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 6px; }
+/* Рядок назви і рядок кнопок — окремо, як у цілі: в один рядок вони не
+   влазять, і кнопки «стрибали» б залежно від довжини назви. */
+.task-top { display: flex; align-items: center; gap: 8px; }
+.task-top .step-n { flex: 0 0 auto; }
+.task-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; row-gap: 6px; margin-top: 7px; }
 /* Звідки прийшла задача. Окремим рядком: у ряд кнопок це вже не влізало. */
 .task-link {
   margin-top: 5px; font-size: 11px; line-height: 1.4;
@@ -756,9 +757,10 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 @media (max-width: 900px) {
   body { padding: 12px; align-items: flex-start; }
   .layout { gap: 14px; }
-  .layout { height: auto; }
+  .layout { max-height: none; }
   .card, #progress-panel, #open-panel { width: 100%; max-width: 560px; }
-  #progress-panel, #open-panel { height: auto; }
+  .scroll-wrap { position: static; }
+  .scroll-wrap > .scroll { position: static; }
   .card { max-height: none; overflow-y: visible; }
   #thermo { display: none; }
   #wq-totals { position: static; width: 100%; max-width: 560px; margin: 14px auto 0; }
@@ -779,7 +781,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   <aside class="panel" id="progress-panel">
     <div class="panel-h">📈 Прогрес по днях</div>
     <div class="panel-sub">Складності і XP за день · ✅ мінімум · 🥇 норма</div>
-    <div class="scroll" id="prog-list"></div>
+    <div class="scroll-wrap"><div class="scroll" id="prog-list"></div></div>
   </aside>
 
   <!-- ЦЕНТР -->
@@ -814,12 +816,12 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   <aside class="panel" id="open-panel">
     <div class="panel-h">🎯 Цілі та задачі</div>
     <div class="panel-sub">Довгі цілі з прогресом і те, що зараз у роботі</div>
-    <div class="scroll">
+    <div class="scroll-wrap"><div class="scroll">
       <div class="sec-h">ЦІЛІ<button class="add" id="goal-add">+ ціль</button></div>
       <div id="goal-list"></div>
       <div class="sec-h" id="open-h">У РОБОТІ<button class="add" id="task-add">+ задача</button></div>
       <div id="open-list"></div>
-    </div>
+    </div></div>
   </aside>
 
 </div>
@@ -1632,6 +1634,9 @@ function addOpen(title, difId, link) {
 function linkedOpenTask(stepId) {
   return loadTasks().find(t => !tDone(t) && t.stepId === stepId) || null;
 }
+// Крок із підкроками теж виноситься: задача бере його назву, а підкроки
+// лишаються ЖИТИ В ЦІЛІ й показуються в рядку задачі як є (одне джерело
+// правди). Копія дерева в задачі неминуче розійшлася б з оригіналом.
 function promoteStep(goalId, stepId) {
   const g = loadGoals().find(x => x.id === goalId);
   if (!g) return false;
@@ -1707,7 +1712,11 @@ function deleteTask(id) {
   const tasks = loadTasks();
   const i = tasks.findIndex(x => x.id === id);
   if (i < 0) return;
-  if (tDone(tasks[i]) && !confirm("Видалити виконану задачу? XP за неї буде знято.")) return;
+  // ⚠️ Питаємо ЗАВЖДИ. Відкрита задача видалялась одним кліком без питання —
+  // і зникала безслідно, бо кошика в застосунку ще немає.
+  if (!confirm(tDone(tasks[i])
+    ? "Видалити виконану задачу «" + tasks[i].title + "»? XP за неї буде знято."
+    : "Видалити задачу «" + tasks[i].title + "»?")) return;
   tasks.splice(i, 1);
   saveTasks(tasks);
   commit();
@@ -2392,6 +2401,29 @@ function linkHtml(t) {
     '🎯 ', esc(g ? g.title : "ціль видалено"), '</div>'].join("");
 }
 
+// Підкроки ЦІЛІ, показані в рядку звʼязаної задачі. Не копія — ті самі
+// вузли: відмітив тут, відмітилось у цілі, і навпаки. Копія дерева
+// розійшлася б з оригіналом за тиждень.
+function linkedBranch(t) {
+  if (!t.goalId || !t.stepId) return null;
+  const g = loadGoals().find(x => x.id === t.goalId);
+  if (!g) return null;
+  const f = findStep(g, t.stepId);
+  if (!f || !(f.st.subs || []).length) return null;
+  return { g, st: f.st };
+}
+function linkedBranchHtml(b) {
+  const h = ['<div class="steps" data-skind="goal" data-sowner="', escAttr(b.g.id), '">',
+    '<div class="steps-note">підкроки цілі · відмічаються тут і там одночасно</div>'];
+  for (const sb of b.st.subs) h.push(
+    '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
+    '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
+    '<span class="step-t">', esc(sb.title), '</span>',
+    '</div>');
+  h.push('</div>');
+  return h.join("");
+}
+
 // Дерево кроків малюється однаково для цілі й для задачі — розмітка спільна,
 // тож і обробник кліків потім один (bindSteps).
 function stepsHtml(kind, o, note) {
@@ -2401,13 +2433,17 @@ function stepsHtml(kind, o, note) {
   // з нього була б розмитою. І лише з цілі: задача в задачу не виноситься.
   const inWork = new Set();
   if (kind === "goal") for (const t of loadTasks()) if (!tDone(t) && t.stepId) inWork.add(t.stepId);
-  const promo = (st, isLeaf) => {
-    if (kind !== "goal" || !isLeaf || st.done) return '';
+  // ↗ є в КОЖНОГО кроку цілі — і в листка, і в кроку з підкроками.
+  const promo = (st) => {
+    if (kind !== "goal" || st.done) return '';
     return inWork.has(st.id)
-      ? '<span class="step-link" title="Уже в роботі">↗</span>'
-      : '<button class="mini" data-sact="tolist" title="Винести в задачі">↗</button>';
+      ? '<span class="step-link" title="Цей крок уже винесено в «У роботі»">↗</span>'
+      : '<button class="mini" data-sact="tolist" title="Винести в «У роботі» окремою задачею">↗</button>';
   };
-  const h = ['<div class="steps">'];
+  // ⚠️ Дерево несе на собі, ЧИЄ воно. Рядок задачі може показувати гілку
+  // ЦІЛІ (див. linkedBranchHtml) — без цих атрибутів обробник правив би
+  // не той журнал.
+  const h = ['<div class="steps" data-skind="', kind, '" data-sowner="', escAttr(o.id), '">'];
   if (note) h.push('<div class="steps-note">', esc(note), '</div>');
   if (!steps.length && !dr) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
   for (const st of steps) {
@@ -2417,7 +2453,7 @@ function stepsHtml(kind, o, note) {
       '<button class="ck" data-sact="toggle">', (st.done ? '☑' : '☐'), '</button>',
       '<span class="step-t">', esc(st.title), '</span>',
       (hasSubs ? '<span class="step-n">' + st.subs.filter(x => x.done).length + '/' + st.subs.length + '</span>' : ''),
-      promo(st, !hasSubs),
+      promo(st),
       '<button class="mini" data-sact="addsub" title="Додати підкрок">+</button>',
       '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
       '</div>'
@@ -2427,7 +2463,7 @@ function stepsHtml(kind, o, note) {
         '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
         '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
         '<span class="step-t">', esc(sb.title), '</span>',
-        promo(sb, true),
+        promo(sb),
         '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
         '</div>'
       );
@@ -2453,7 +2489,8 @@ function renderGoals() {
     const pct = p.tot ? Math.min(100, (p.cur / p.tot) * 100) : 0;
     const dn = gDone(g);
     const steps = g.mode === "steps";
-    const open = _rowOpen.has(g.id);
+    const hasSteps = (g.steps || []).length > 0;
+    const open = hasSteps && _rowOpen.has(g.id);
 
     if (_editGoal === g.id) {
       // Форма редагування на місці цілі. Значення живуть в інпутах і
@@ -2480,10 +2517,11 @@ function renderGoals() {
       '" style="--gc:', tier.color, ';--gc-t:', hexToRgba(tier.color, 0.10), '">',
       '<div class="goal-top">',
       '<span class="grip" data-gact="grip" title="Перетягни, щоб змінити порядок">⠿</span>',
-      // ⚠️ Розгортання доступне ЗАВЖДИ, а не лише для крокових цілей: план
-      // із кроків потрібен і числовій цілі («заробити 100 $» теж має етапи).
-      '<button class="mini exp" data-gact="exp" title="', (open ? 'Згорнути' : 'Розгорнути план'), '">',
-      (open ? '▾' : '▸'), '</button>',
+      // ⚠️ Стрілка зʼявляється, ЛИШЕ коли є що розгортати. Порожня стрілка
+      // на кожному рядку — це шум і обіцянка вмісту, якого немає.
+      // Перший крок додається кнопкою «+ крок», вона є завжди.
+      (hasSteps ? '<button class="mini exp" data-gact="exp" title="' +
+        (open ? 'Згорнути план' : 'Розгорнути план') + '">' + (open ? '▾' : '▸') + '</button>' : ''),
       '<span class="goal-t">', esc(g.title), '</span>',
       '<span class="goal-xp" title="', escAttr("вага цілі: " + tier.name), '">',
       (dn ? '✓ +' : '+'), (g.xp | 0), ' XP</span></div>',
@@ -2499,10 +2537,10 @@ function renderGoals() {
              '<span>/ ', p.tot, ' ', esc(p.unit), '</span>',
              '<button class="mini" data-gact="inc">+</button>');
     }
-    h.push('<button class="mini" data-gact="addstep" title="Додати крок">+ крок</button>',
-           (dn ? '<button class="mini" data-gact="reopen">↩</button>' : ''),
-           '<button class="mini" data-gact="edit" title="Редагувати">✎</button>',
-           '<button class="mini dz" data-gact="del">🗑</button>',
+    h.push('<button class="mini" data-gact="addstep" title="Додати крок до плану">+ крок</button>',
+           (dn ? '<button class="mini" data-gact="reopen" title="Повернути в роботу">↩</button>' : ''),
+           '<button class="mini" data-gact="edit" title="Редагувати ціль">✎</button>',
+           '<button class="mini dz" data-gact="del" title="Видалити ціль">🗑</button>',
            '</div>');
 
     if (open) {
@@ -2538,28 +2576,36 @@ function renderOpen() {
       );
       continue;
     }
-    const open = _rowOpen.has(t.id);
-    const lv = goalLeaves(t);                 // листки рахуються так само, як у цілі
+    // Задача, винесена з кроку з підкроками, показує гілку ЦІЛІ, а не свою.
+    const br = linkedBranch(t);
+    const lv = br ? br.st.subs : goalLeaves(t);
+    const hasSteps = lv.length > 0;
+    const open = hasSteps && _rowOpen.has(t.id);
     h.push(
       '<div class="task" style="--c:', d.color, '" data-task="', escAttr(t.id),
       '" data-owner="', escAttr(t.id), '">',
+      // ⚠️ Назва і кнопки — РІЗНІ рядки, як у цілі. В один рядок вони не
+      // влазять, і кнопки «стрибали» б залежно від довжини назви.
       '<div class="task-top">',
-      '<button class="mini exp" data-tact="exp" title="', (open ? 'Згорнути' : 'Розгорнути підзадачі'), '">',
-      (open ? '▾' : '▸'), '</button>',
+      (hasSteps ? '<button class="mini exp" data-tact="exp" title="' +
+        (open ? 'Згорнути підзадачі' : 'Розгорнути підзадачі') + '">' + (open ? '▾' : '▸') + '</button>' : ''),
       '<span class="task-t">', esc(t.title), '</span>',
-      (lv.length ? '<span class="step-n">' + lv.filter(x => x.done).length + '/' + lv.length + '</span>' : ''),
+      (hasSteps ? '<span class="step-n">' + lv.filter(x => x.done).length + '/' + lv.length + '</span>' : ''),
       '<span class="task-x">+', d.xp | 0, '</span>',
-      // Компактний «＋», а не «+ крок»: у вузькій колонці задачі підпис
-      // виштовхував ✓ ✎ 🗑 на другий рядок.
-      '<button class="mini" data-tact="addstep" title="Додати підзадачу">＋</button>',
-      '<button class="mini" data-tact="done" title="Виконано">✓</button>',
-      '<button class="mini" data-tact="edit" title="Редагувати">✎</button>',
-      '<button class="mini" data-tact="del">🗑</button>',
+      '</div>',
+      '<div class="task-ctl">',
+      // Підкроки звʼязаної гілки додаються в ЦІЛІ, тож тут кнопки немає:
+      // інакше було б два місця, куди «додати», з різним результатом.
+      (br ? '' : '<button class="mini" data-tact="addstep" title="Додати підзадачу">+ крок</button>'),
+      '<button class="mini" data-tact="done" title="Виконано — записати XP">✓</button>',
+      '<button class="mini" data-tact="edit" title="Редагувати назву">✎</button>',
+      '<button class="mini dz" data-tact="del" title="Видалити задачу">🗑</button>',
       '</div>',
       linkHtml(t),
       // ⚠️ Кроки задачі НЕ закривають її самі: XP дає складність, і момент
       // нарахування має лишатись за користувачем (кнопка ✓).
-      (open ? stepsHtml("task", t, "підзадачі · задачу закриваєш ти кнопкою ✓") : ''),
+      (!open ? '' : br ? linkedBranchHtml(br)
+        : stepsHtml("task", t, "підзадачі · задачу закриваєш ти кнопкою ✓")),
       '</div>'
     );
   }
@@ -2898,10 +2944,15 @@ function bindSteps(listId, kind) {
     }
     const row = e.target.closest("[data-step]");
     if (!row) return;
-    const oid = box.dataset.owner, sid = row.dataset.step, act = btn.dataset.sact;
-    if (act === "toggle") toggleStep(kind, oid, sid);
-    else if (act === "del") delStep(kind, oid, sid);
-    else if (act === "addsub") openStepDraft(kind, oid, sid);
+    // ⚠️ Чиє дерево — каже саме дерево, а не список, у якому воно лежить:
+    // рядок задачі може показувати гілку ЦІЛІ.
+    const tree = e.target.closest("[data-sowner]");
+    const k = tree ? tree.dataset.skind : kind;
+    const oid = tree ? tree.dataset.sowner : box.dataset.owner;
+    const sid = row.dataset.step, act = btn.dataset.sact;
+    if (act === "toggle") toggleStep(k, oid, sid);
+    else if (act === "del") delStep(k, oid, sid);
+    else if (act === "addsub") openStepDraft(k, oid, sid);
     else if (act === "tolist") promoteStep(oid, sid);
   });
   // Enter лишає чернетку відкритою — серію кроків можна надрукувати

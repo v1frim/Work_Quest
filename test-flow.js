@@ -401,8 +401,8 @@ const SCRIPT = `(function () {
     const leafA1 = gl.steps[0].subs[0].id, leafB = gl.steps[1].id;
     ok("кнопка ↗ є в підкроку",
        document.querySelector('[data-step="' + leafA1 + '"] [data-sact="tolist"]') !== null, true);
-    ok("кнопки ↗ немає в кроку з підкроками",
-       document.querySelector('[data-step="' + gl.steps[0].id + '"] [data-sact="tolist"]'), null);
+    ok("кнопка ↗ є і в кроку з підкроками",
+       document.querySelector('[data-step="' + gl.steps[0].id + '"] [data-sact="tolist"]') !== null, true);
     document.querySelector('[data-step="' + leafA1 + '"] [data-sact="tolist"]').click();
     const lt = loadTasks()[0];
     ok("задачу створено з кроку", loadTasks().length, 1);
@@ -446,6 +446,48 @@ const SCRIPT = `(function () {
        document.getElementById("open-list").innerHTML.indexOf("ціль видалено") >= 0, true);
     completeTask(loadTasks()[0].id);
     ok("задача без цілі закривається", loadTasks()[0].doneAt > 0, true);
+
+    // Крок ІЗ ПІДКРОКАМИ виноситься теж, і задача показує гілку ЦІЛІ,
+    // а не копію: відмітка в панелі задач має міняти саме ціль.
+    localStorage.clear();
+    addGoalSteps("Ціль із гілкою", [{ title: "Великий крок", subs: ["п1", "п2"] }], 200);
+    const gb = loadGoals()[0], bigId = gb.steps[0].id, sub1 = gb.steps[0].subs[0].id;
+    promoteStep(gb.id, bigId);
+    const tb = loadTasks()[0];
+    ok("крок із підкроками винесено", tb.title, "Великий крок");
+    ok("задача звʼязана з кроком-контейнером", tb.stepId, bigId);
+    _rowOpen.add(tb.id); refresh();
+    const branch = document.querySelector('[data-task="' + tb.id + '"] .steps');
+    ok("у задачі показано гілку цілі", branch.dataset.sowner, gb.id);
+    ok("гілка позначена як ціль", branch.dataset.skind, "goal");
+    ok("підкроки цілі видно в задачі", branch.querySelectorAll(".step").length, 2);
+    ok("своїх кроків задача не завела", loadTasks()[0].steps.length, 0);
+    ok("кнопки «+ крок» у звʼязаної задачі немає",
+       document.querySelector('[data-task="' + tb.id + '"] [data-tact="addstep"]'), null);
+    // Клік у панелі задач править ЦІЛЬ, а не задачу.
+    branch.querySelector('[data-step="' + sub1 + '"] [data-sact="toggle"]').click();
+    ok("підкрок цілі відмічено з панелі задач", findStep(loadGoals()[0], sub1).st.done, true);
+    ok("задача при цьому не закрилась", loadTasks()[0].doneAt, null);
+
+    // Стрілка розгортання є ЛИШЕ там, де є що розгортати.
+    localStorage.clear();
+    addGoal("Гола числова ціль", 3, "шт", 100, 0);
+    addOpen("Гола задача", activeDifs()[0].id);
+    const bareG = loadGoals()[0].id, bareT = loadTasks()[0].id;
+    ok("у цілі без кроків стрілки немає",
+       document.querySelector('[data-goal="' + bareG + '"] [data-gact="exp"]'), null);
+    ok("у задачі без кроків стрілки немає",
+       document.querySelector('[data-task="' + bareT + '"] [data-tact="exp"]'), null);
+    ok("кнопка «+ крок» у цілі є завжди",
+       document.querySelector('[data-goal="' + bareG + '"] [data-gact="addstep"]') !== null, true);
+    ok("кнопка «+ крок» у задачі є завжди",
+       document.querySelector('[data-task="' + bareT + '"] [data-tact="addstep"]') !== null, true);
+    addStep("goal", bareG, "Перший крок", null);
+    addStep("task", bareT, "Перша підзадача", null);
+    ok("стрілка в цілі зʼявилась після кроку",
+       document.querySelector('[data-goal="' + bareG + '"] [data-gact="exp"]') !== null, true);
+    ok("стрілка в задачі зʼявилась після кроку",
+       document.querySelector('[data-task="' + bareT + '"] [data-tact="exp"]') !== null, true);
 
     // 18. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
     // Це саме та регресія, яку не видно в жодному числі, крім координат:
