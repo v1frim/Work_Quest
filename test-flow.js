@@ -337,6 +337,32 @@ const SCRIPT = `(function () {
     ok("колір ваги в рядку", document.getElementById("goal-list").innerHTML.indexOf(goalTier(byTitle("C")).color) >= 0, true);
     ok("ручка перетягування є", document.querySelectorAll("#goal-list .grip").length, 3);
 
+    // 16. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
+    // Це саме та регресія, яку не видно в жодному числі, крім координат:
+    // до фіксу висота сітки росла й вертикальне центрування зсувало все вгору.
+    localStorage.clear();
+    addGoalSteps("Довга ціль", [
+      { title: "Крок 1", subs: ["a", "b", "c"] },
+      { title: "Крок 2", subs: ["d", "e", "f"] },
+      { title: "Крок 3", subs: ["g", "h", "i"] }
+    ], 500);
+    const gid = loadGoals()[0].id;
+    const layout = document.querySelector(".layout");
+    const card = document.querySelector(".card");
+    const beforeH = Math.round(layout.getBoundingClientRect().height);
+    const beforeTop = Math.round(card.getBoundingClientRect().top);
+    document.querySelector('[data-goal="' + gid + '"] [data-gact="exp"]').click();
+    ok("ціль розгорнулась", document.querySelectorAll("#goal-list .step").length > 0, true);
+    ok("висота сітки не змінилась", Math.round(layout.getBoundingClientRect().height), beforeH);
+    ok("картка не зсунулась", Math.round(card.getBoundingClientRect().top), beforeTop);
+    // Зростання поглинає внутрішній скрол панелі, а не сторінка.
+    // Панель не має права вирости вище за сітку: усе зростання йде у .scroll.
+    const panelH = Math.round(document.getElementById("open-panel").getBoundingClientRect().height);
+    ok("панель не вища за сітку", panelH <= Math.round(layout.getBoundingClientRect().height), true);
+    const sc = document.querySelector("#open-panel .scroll");
+    ok("вміст панелі скролиться, а не розпирає її", sc.scrollHeight <= sc.clientHeight || getComputedStyle(sc).overflowY !== "visible", true);
+    ok("сторінка не прокручується", document.documentElement.scrollHeight <= innerHeight + 1, true);
+
     localStorage.clear();
   } catch (e) {
     out.push({ name: "ВИНЯТОК", got: (e && e.message) || String(e), want: "—", pass: false });
@@ -364,6 +390,11 @@ function run(wsUrl) {
       const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
       await send("Runtime.enable", {}, sessionId);
       await send("Page.enable", {}, sessionId);
+      // ⚠️ Розмір вікна задаємо ЯВНО. Безголовий Chromium стартує з крихітним
+      // viewport, три колонки згортаються через flex-wrap, і будь-яка перевірка
+      // геометрії міряє не ту розкладку, яку бачить користувач на ПК.
+      await send("Emulation.setDeviceMetricsOverride",
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
       await send("Page.navigate", { url: PAGE }, sessionId);
       await new Promise((r) => setTimeout(r, 2500));
 
