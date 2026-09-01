@@ -149,6 +149,30 @@ const SCRIPT = `(function () {
     localStorage.setItem("workquest_backup_date_v1", todayKey());
     ok("копія сьогодні → вік 0", backupAgeDays(), 0);
 
+    // 12. ⚠️ МІГРАЦІЯ РЕЄСТРУ СКЛАДНОСТЕЙ.
+    // Реєстр належить користувачу, тож нова стандартна складність не може
+    // приїхати просто правкою config.js — саме на цьому проєкт уже спіткнувся.
+    localStorage.clear();
+    const old = DEFAULT_DIFFICULTIES.filter(x => x.id !== "d_titan").map(x => Object.assign({}, x));
+    localStorage.setItem("workquest_difficulties_v1", JSON.stringify(old));
+    localStorage.setItem("workquest_meta_v1", JSON.stringify({ schema: 1 }));
+    localStorage.setItem("workquest_tasks_v1", "[]");
+    runMigrations();
+    const after = loadDifs();
+    ok("міграція долила нову складність", after.some(x => x.id === "d_titan"), true);
+    ok("решта складностей на місці", after.length, DEFAULT_DIFFICULTIES.length);
+    ok("схему піднято", loadMeta().schema, WQ_SCHEMA);
+
+    // Свідомо видалену складність міграція НЕ повертає: вона вже відпрацювала.
+    saveDifs(loadDifs().filter(x => x.id !== "d_titan"));
+    runMigrations();
+    ok("видалену складність не повертає", loadDifs().some(x => x.id === "d_titan"), false);
+
+    // Новий користувач: міграції не ганяються, схема ставиться одразу.
+    localStorage.clear();
+    runMigrations();
+    ok("новому користувачу — одразу поточна схема", loadMeta().schema, WQ_SCHEMA);
+
     localStorage.clear();
   } catch (e) {
     out.push({ name: "ВИНЯТОК", got: (e && e.message) || String(e), want: "—", pass: false });
