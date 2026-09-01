@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0e20">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <title>Work Quest — трекер робочих задач</title>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -504,12 +505,26 @@ h1 {
 .sec-h .add:hover { background: var(--solid-btn-hov); }
 
 /* — ціль — */
+/* Колір лівої межі й підпису XP = ВАГА цілі за GOAL_TIERS (аналог складності
+   задачі). Тінт поверх соліда — щоб читалось на всіх фазах доби. */
 .goal {
   padding: 9px 11px; margin-bottom: 8px;
-  background: var(--solid-btn); border: var(--bd-ghost); border-left: 3px solid var(--gold);
+  background: linear-gradient(0deg, var(--gc-t, transparent), var(--gc-t, transparent)), var(--solid-btn);
+  border: var(--bd-ghost); border-left: 3px solid var(--gc, var(--gold));
   border-radius: var(--r-btn);
+  transition: opacity var(--t-fast) ease, box-shadow var(--t-fast) ease;
 }
+.goal .goal-xp { color: var(--gc, var(--gold)); }
 .goal.done { border-left-color: var(--st-done); opacity: 0.6; }
+.goal.done .goal-xp { color: var(--st-done); }
+.goal.dragging { opacity: 0.4; }
+.goal.over { box-shadow: 0 -3px 0 0 var(--gold); }
+.grip {
+  flex: 0 0 auto; cursor: grab; user-select: none;
+  color: var(--tx-6); font-size: 13px; line-height: 1; padding: 0 2px;
+}
+.grip:active { cursor: grabbing; }
+.goal:hover .grip { color: var(--tx-3); }
 .goal-top { display: flex; align-items: center; gap: 8px; }
 .goal-t   { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 700; color: var(--tx-1); }
 .goal.done .goal-t { text-decoration: line-through; }
@@ -1155,8 +1170,9 @@ const MIGRATIONS = {
       id: rid("s_"), title: t, done: false,
       subs: (subs || []).map(x => ({ id: rid("s_"), title: x, done: false }))
     });
+    let seedOrder = 0;
     const goal = (extra) => Object.assign({
-      id: rid("g_"), seedTag: "tovarka_v1", note: "", steps: [],
+      id: rid("g_"), seedTag: "tovarka_v1", note: "", steps: [], order: ++seedOrder,
       target: 0, current: 0, unit: "",
       createdAt: now, doneAt: null, doneDay: null, xpAwarded: null
     }, extra);
@@ -1265,6 +1281,9 @@ function sanitizeData() {
     }
     if (gDone(g) && !g.doneDay) { g.doneDay = dayKeyOf(g.doneAt); gf++; }
   }
+  // Порядок цілей — ручний, тож у старих записів його немає: роздаємо за
+  // поточним положенням у масиві. Ідемпотентно: вдруге вже нічого не змінить.
+  goals.forEach((g, i) => { if (typeof g.order !== "number") { g.order = i + 1; gf++; } });
   if (gf) saveGoals(goals);
 }
 
@@ -1649,6 +1668,14 @@ function goalLeaves(g) {
   }
   return out;
 }
+// Вага цілі за її XP — та сама ідея, що й складність задачі: чим дорожче,
+// тим «гарячіший» колір. Береться перший поріг, який ціль перевищила.
+function goalTier(g) {
+  const xp = g.xp | 0;
+  for (const t of GOAL_TIERS) if (xp >= t.min) return t;
+  return GOAL_TIERS[GOAL_TIERS.length - 1];
+}
+
 function goalProgress(g) {
   if (g.mode === "steps") {
     const lv = goalLeaves(g);
@@ -1695,12 +1722,33 @@ function normSteps(list) {
   return out;
 }
 
+function nextGoalOrder() {
+  return loadGoals().reduce((n, g) => Math.max(n, g.order | 0), 0) + 1;
+}
+
+// Перенесення цілі: from стає на місце to. Виділено в окрему функцію, щоб
+// логіка була однією й перевірялась тестом незалежно від того, чим її
+// викликали — перетягуванням мишею чи чимось іншим.
+function reorderGoals(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return false;
+  const goals = loadGoals().sort((a, b) => (a.order | 0) - (b.order | 0));
+  const fi = goals.findIndex(g => g.id === fromId);
+  const ti = goals.findIndex(g => g.id === toId);
+  if (fi < 0 || ti < 0) return false;
+  const [moved] = goals.splice(fi, 1);
+  goals.splice(ti, 0, moved);
+  goals.forEach((g, i) => { g.order = i + 1; });
+  saveGoals(goals);
+  commit();
+  return true;
+}
+
 function addGoal(title, target, unit, xp, current) {
   const t = String(title || "").trim().slice(0, 200);
   if (!t) return false;
   const goals = loadGoals();
   goals.push({
-    id: rid("g_"), title: t, note: "", mode: "number",
+    id: rid("g_"), title: t, note: "", mode: "number", order: nextGoalOrder(),
     target: Math.max(1, target | 0), current: Math.max(0, current | 0),
     unit: String(unit || "").trim().slice(0, 12),
     steps: [],
@@ -1718,7 +1766,7 @@ function addGoalSteps(title, steps, xp) {
   if (!t || !norm.length) return false;
   const goals = loadGoals();
   goals.push({
-    id: rid("g_"), title: t, note: "", mode: "steps",
+    id: rid("g_"), title: t, note: "", mode: "steps", order: nextGoalOrder(),
     target: 0, current: 0, unit: "",
     steps: norm,
     xp: Math.max(0, xp | 0),
@@ -2239,7 +2287,9 @@ function draftRow(isSub) {
 }
 
 function renderGoals() {
-  const goals = loadGoals().slice().sort((a, b) => (gDone(a) ? 1 : 0) - (gDone(b) ? 1 : 0) || b.createdAt - a.createdAt);
+  // Досягнуті — донизу, решта за ручним порядком.
+  const goals = loadGoals().slice().sort((a, b) =>
+    (gDone(a) ? 1 : 0) - (gDone(b) ? 1 : 0) || (a.order | 0) - (b.order | 0));
   if (!goals.length) {
     $("goal-list").innerHTML = '<div class="empty">Цілей ще немає. Ціль — це щось довше за задачу: «заробити 100 $» або список кроків із підкроками.</div>';
     return;
@@ -2270,12 +2320,16 @@ function renderGoals() {
       continue;
     }
 
+    const tier = goalTier(g);
     h.push(
-      '<div class="goal', (dn ? ' done' : ''), '" data-goal="', escAttr(g.id), '">',
+      '<div class="goal', (dn ? ' done' : ''), '" data-goal="', escAttr(g.id),
+      '" style="--gc:', tier.color, ';--gc-t:', hexToRgba(tier.color, 0.10), '">',
       '<div class="goal-top">',
+      '<span class="grip" data-gact="grip" title="Перетягни, щоб змінити порядок">⠿</span>',
       (steps ? '<button class="mini exp" data-gact="exp">' + (open ? '▾' : '▸') + '</button>' : ''),
       '<span class="goal-t">', esc(g.title), '</span>',
-      '<span class="goal-xp">', (dn ? '✓ +' : '+'), (g.xp | 0), ' XP</span></div>',
+      '<span class="goal-xp" title="', escAttr("вага цілі: " + tier.name), '">',
+      (dn ? '✓ +' : '+'), (g.xp | 0), ' XP</span></div>',
       '<div class="goal-bar"><div class="goal-fill" style="width:', pct.toFixed(1), '%"></div></div>',
       '<div class="goal-ctl">'
     );
@@ -2629,6 +2683,47 @@ $("goal-list").addEventListener("click", e => {
     refresh("goals");
   }
   else if (act === "ecancel") { _editGoal = null; refresh("goals"); }
+});
+
+/* ── Перетягування цілей ──
+   ⚠️ draggable вмикається ЛИШЕ поки затиснута ручка ⠿. Якби рядок був
+   draggable завжди, у ньому не можна було б виділити текст і працювати
+   з полем прогресу — браузер перехоплював би затиск як початок перетягування. */
+let _dragGoal = null;
+$("goal-list").addEventListener("mousedown", e => {
+  const grip = e.target.closest('[data-gact="grip"]');
+  if (!grip) return;
+  const box = grip.closest("[data-goal]");
+  if (box) box.setAttribute("draggable", "true");
+});
+$("goal-list").addEventListener("dragstart", e => {
+  const box = e.target.closest("[data-goal]");
+  if (!box) return;
+  _dragGoal = box.dataset.goal;
+  box.classList.add("dragging");
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+});
+$("goal-list").addEventListener("dragover", e => {
+  if (!_dragGoal) return;
+  e.preventDefault();                       // без цього drop не спрацює взагалі
+  const box = e.target.closest("[data-goal]");
+  for (const el of $("goal-list").querySelectorAll(".over")) el.classList.remove("over");
+  if (box && box.dataset.goal !== _dragGoal) box.classList.add("over");
+});
+$("goal-list").addEventListener("drop", e => {
+  e.preventDefault();
+  const box = e.target.closest("[data-goal]");
+  if (box && _dragGoal) reorderGoals(_dragGoal, box.dataset.goal);
+  _dragGoal = null;
+});
+// dragend спрацьовує завжди — і при вдалому кидку, і при скасуванні,
+// тож прибирання підсвіток і draggable живе саме тут.
+$("goal-list").addEventListener("dragend", () => {
+  _dragGoal = null;
+  for (const el of $("goal-list").querySelectorAll("[data-goal]")) {
+    el.classList.remove("dragging", "over");
+    el.removeAttribute("draggable");
+  }
 });
 
 // Кроки й підкроки — окремим делегованим обробником, щоб не плутати з діями цілі.

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Значок Work Quest: золотий шестикутник рівня з галочкою «зроблено».
+       SVG, а не PNG — один файл, чіткий на будь-якому масштабі вкладки. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe9a8"/>
+      <stop offset="55%" stop-color="#ffd166"/>
+      <stop offset="100%" stop-color="#d99b2b"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0a0e20"/>
+  <path d="M32 7 L54 19 L54 45 L32 57 L10 45 L10 19 Z" fill="url(#g)"/>
+  <path d="M21 32.5 L28.5 40 L44 24.5" fill="none" stroke="#1a1206"
+        stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

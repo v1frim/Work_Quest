@@ -313,6 +313,30 @@ const SCRIPT = `(function () {
     ok("xpAwarded досягнутої цілі заморожено", loadGoals()[0].xpAwarded, 250);
     ok("нова ціна записана на майбутнє", loadGoals()[0].xp, 999);
 
+    // 15. Порядок цілей і вага за XP.
+    localStorage.clear();
+    addGoal("A", 1, "", 100, 0);
+    addGoal("B", 1, "", 2000, 0);
+    addGoal("C", 1, "", 50000, 0);
+    const ord = () => loadGoals().slice().sort((a,b)=>(a.order|0)-(b.order|0)).map(x=>x.title).join("");
+    ok("початковий порядок", ord(), "ABC");
+    const ids = {};
+    loadGoals().forEach(x => { ids[x.title] = x.id; });
+    reorderGoals(ids.C, ids.A);            // C на місце A
+    ok("перенесення вгору", ord(), "CAB");
+    reorderGoals(ids.C, ids.B);            // C у кінець
+    ok("перенесення вниз", ord(), "ABC");
+    ok("сам на себе — без змін", reorderGoals(ids.A, ids.A), false);
+
+    // Вага береться за першим порогом, який ціль перевищила.
+    const byTitle = t => loadGoals().find(x => x.title === t);
+    ok("100 XP → дрібна", goalTier(byTitle("A")).name, "дрібна");
+    ok("2000 XP → велика", goalTier(byTitle("B")).name, "велика");
+    ok("50000 XP → легендарна", goalTier(byTitle("C")).name, "легендарна");
+    // Колір ваги реально доїжджає в розмітку.
+    ok("колір ваги в рядку", document.getElementById("goal-list").innerHTML.indexOf(goalTier(byTitle("C")).color) >= 0, true);
+    ok("ручка перетягування є", document.querySelectorAll("#goal-list .grip").length, 3);
+
     localStorage.clear();
   } catch (e) {
     out.push({ name: "ВИНЯТОК", got: (e && e.message) || String(e), want: "—", pass: false });
