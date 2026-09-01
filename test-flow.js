@@ -277,6 +277,42 @@ const SCRIPT = `(function () {
     ok("пільга: серія норми жива зранку", S().streak.norma, 1);
     ok("мінімум-серія сьогодні ще 0", S().streak.current, 0);
 
+    // 14. Редагування на місці.
+    localStorage.clear();
+    setMode("todo");
+    document.getElementById("task-input").value = "Стара назва";
+    document.querySelector('#dif-row [data-dif="' + d.id + '"]').click();
+    setMode("done");
+    const et = loadTasks()[0];
+    // кнопка ✎ відкриває форму, збереження міняє назву
+    document.querySelector('[data-task="' + et.id + '"] [data-tact="edit"]').click();
+    const inp = document.querySelector(".task.edit .te-title");
+    ok("форма редагування задачі відкрилась", !!inp, true);
+    inp.value = "Нова назва";
+    document.querySelector('.task.edit [data-tact="esave"]').click();
+    ok("назву задачі змінено", loadTasks()[0].title, "Нова назва");
+
+    addGoal("Стара ціль", 10, "шт", 100, 9);
+    const eg = loadGoals()[0];
+    document.querySelector('[data-goal="' + eg.id + '"] [data-gact="edit"]').click();
+    ok("форма редагування цілі відкрилась", !!document.querySelector(".goal.edit .ge-title"), true);
+    document.querySelector(".goal.edit .ge-title").value = "Нова ціль";
+    document.querySelector(".goal.edit .ge-target").value = "8";
+    document.querySelector(".goal.edit .ge-xp").value = "250";
+    document.querySelector('.goal.edit [data-gact="esave"]').click();
+    const eg2 = loadGoals()[0];
+    ok("назву цілі змінено", eg2.title, "Нова ціль");
+    ok("мету змінено", eg2.target, 8);
+    // прогрес 9 > нова мета 8 → ціль чесно закрилась тим самим шляхом
+    ok("зниження мети закрило ціль", S().goals.done, 1);
+    ok("XP за неї — за новою ціною", eg2.xpAwarded, 250);
+    // ⚠️ заморозка: зміна XP у ДОСЯГНУТОЇ цілі не чіпає нарахованого
+    document.querySelector('[data-goal="' + eg.id + '"] [data-gact="edit"]').click();
+    document.querySelector(".goal.edit .ge-xp").value = "999";
+    document.querySelector('.goal.edit [data-gact="esave"]').click();
+    ok("xpAwarded досягнутої цілі заморожено", loadGoals()[0].xpAwarded, 250);
+    ok("нова ціна записана на майбутнє", loadGoals()[0].xp, 999);
+
     localStorage.clear();
   } catch (e) {
     out.push({ name: "ВИНЯТОК", got: (e && e.message) || String(e), want: "—", pass: false });

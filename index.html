@@ -533,6 +533,19 @@ h1 {
 .mini:hover { color: var(--gold); border-color: rgba(255,209,102,0.4); }
 .mini.dz { margin-left: auto; }
 
+/* — редагування на місці + гарантований перенос довгих назв —
+   ⚠️ Кнопки-дії не стискаються (flex:none), а текст переноситься на наступні
+   рядки: overflow-wrap:anywhere ламає навіть суцільні слова/URL, які інакше
+   розпирали б рядок і тиснули кнопки. — */
+.goal-t, .task-t, .step-t, .dlog-t { overflow-wrap: anywhere; white-space: normal; }
+.task .mini, .goal-ctl .mini, .goal-top .mini, .step .mini { flex: 0 0 auto; }
+.task .task-x { flex: 0 0 auto; }
+.edit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.edit-row:first-child { margin-top: 0; }
+.edit-lbl { font-size: 11px; color: var(--tx-4); }
+.task.edit { gap: 6px; }
+.task.edit .te-title { padding: 5px 9px; font-size: 13px; }
+
 /* — кроки цілі — */
 .goal .exp { padding: 2px 6px; }
 .steps { margin-top: 8px; padding-top: 7px; border-top: var(--bd-row); }
@@ -1576,6 +1589,17 @@ function uncompleteTask(id) {
   saveTasks(tasks);
   commit();
 }
+function editTaskTitle(id, title) {
+  const tasks = loadTasks();
+  const t = tasks.find(x => x.id === id);
+  const v = String(title || "").trim().slice(0, 200);
+  if (!t || !v) return false;
+  t.title = v;
+  saveTasks(tasks);
+  commit();
+  return true;
+}
+
 function deleteTask(id) {
   const tasks = loadTasks();
   const i = tasks.findIndex(x => x.id === id);
@@ -1790,6 +1814,31 @@ function reopenGoal(id) {
   saveGoals(goals);
   commit();
 }
+// Редагування цілі: назва, XP і (для числової) мета з одиницею.
+// ⚠️ Зміна xp у ДОСЯГНУТОЇ цілі не чіпає xpAwarded — той самий принцип
+// заморозки, що й у складностей: нова ціна діє лише на майбутнє.
+// Зниження мети нижче за поточний прогрес чесно закриває ціль через
+// syncGoalDone — тим самим шляхом, що й звичайне досягнення.
+function editGoal(id, patch) {
+  const goals = loadGoals();
+  const g = goals.find(x => x.id === id);
+  if (!g) return false;
+  const v = String(patch.title || "").trim().slice(0, 200);
+  if (!v) return false;
+  g.title = v;
+  g.xp = Math.max(0, patch.xp | 0);
+  if (g.mode !== "steps") {
+    g.target = Math.max(1, patch.target | 0);
+    g.unit = String(patch.unit || "").trim().slice(0, 12);
+    g.current = Math.min(g.current | 0, g.target);
+  }
+  const r = syncGoalDone(g);
+  saveGoals(goals);
+  commit();
+  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+  return true;
+}
+
 function deleteGoal(id) {
   const goals = loadGoals();
   const i = goals.findIndex(x => x.id === id);
@@ -2149,6 +2198,10 @@ function renderDays() {
 // Розгорнуті цілі тримаємо в пам'яті: це стан перегляду, не дані користувача.
 const _goalOpen = new Set();
 
+// Що зараз редагується (id або null). Стан перегляду, не дані.
+let _editTask = null;
+let _editGoal = null;
+
 // Чернетка нового кроку: {goalId, parentId|null}. Рендериться інлайн-рядком
 // у самому дереві — браузерний prompt() тут виглядав як чужорідне вікно.
 let _stepDraft = null;
@@ -2199,6 +2252,24 @@ function renderGoals() {
     const steps = g.mode === "steps";
     const open = _goalOpen.has(g.id);
 
+    if (_editGoal === g.id) {
+      // Форма редагування на місці цілі. Значення живуть в інпутах і
+      // збираються лише по ✓ — інакше кожна літера забирала б фокус.
+      h.push(
+        '<div class="goal edit" data-goal="', escAttr(g.id), '">',
+        '<div class="edit-row"><input class="fld grow ge-title" value="', escAttr(g.title), '" maxlength="200"></div>',
+        '<div class="edit-row">',
+        (steps ? '' :
+          '<span class="edit-lbl">мета</span><input class="fld ge-target" type="number" min="1" value="' + (g.target | 0) + '" style="width:76px">' +
+          '<input class="fld ge-unit" value="' + escAttr(g.unit || "") + '" placeholder="шт" style="width:64px">'),
+        '<span class="edit-lbl">XP</span><input class="fld ge-xp" type="number" min="0" step="10" value="', (g.xp | 0), '" style="width:80px">',
+        '<button class="mini" data-gact="esave" title="Зберегти (Enter)">✓</button>',
+        '<button class="mini" data-gact="ecancel" title="Скасувати (Esc)">✕</button>',
+        '</div></div>'
+      );
+      continue;
+    }
+
     h.push(
       '<div class="goal', (dn ? ' done' : ''), '" data-goal="', escAttr(g.id), '">',
       '<div class="goal-top">',
@@ -2219,6 +2290,7 @@ function renderGoals() {
              '<button class="mini" data-gact="inc">+</button>');
     }
     h.push((dn ? '<button class="mini" data-gact="reopen">↩</button>' : ''),
+           '<button class="mini" data-gact="edit" title="Редагувати">✎</button>',
            '<button class="mini dz" data-gact="del">🗑</button>',
            '</div>');
 
@@ -2264,11 +2336,22 @@ function renderOpen() {
   const h = [];
   for (const t of open) {
     const d = getDif(t.difficultyId);
+    if (_editTask === t.id) {
+      h.push(
+        '<div class="task edit" style="--c:', d.color, '" data-task="', escAttr(t.id), '">',
+        '<input class="fld grow te-title" value="', escAttr(t.title), '" maxlength="200">',
+        '<button class="mini" data-tact="esave" title="Зберегти (Enter)">✓</button>',
+        '<button class="mini" data-tact="ecancel" title="Скасувати (Esc)">✕</button>',
+        '</div>'
+      );
+      continue;
+    }
     h.push(
       '<div class="task" style="--c:', d.color, '" data-task="', escAttr(t.id), '">',
       '<span class="task-t">', esc(t.title), '</span>',
       '<span class="task-x">+', d.xp | 0, '</span>',
-      '<button class="mini" data-tact="done">✓</button>',
+      '<button class="mini" data-tact="done" title="Виконано">✓</button>',
+      '<button class="mini" data-tact="edit" title="Редагувати">✎</button>',
       '<button class="mini" data-tact="del">🗑</button>',
       '</div>'
     );
@@ -2528,6 +2611,24 @@ $("goal-list").addEventListener("click", e => {
     refresh("goals");
   }
   else if (act === "addstep") openStepDraft(id, null);
+  else if (act === "edit") {
+    _editGoal = id;
+    refresh("goals");
+    const i = $("goal-list").querySelector(".goal.edit .ge-title");
+    if (i) { i.focus(); i.select(); }
+  }
+  else if (act === "esave") {
+    const box = btn.closest("[data-goal]");
+    editGoal(id, {
+      title: box.querySelector(".ge-title").value,
+      target: +((box.querySelector(".ge-target") || {}).value || 0),
+      unit: ((box.querySelector(".ge-unit") || {}).value || ""),
+      xp: +box.querySelector(".ge-xp").value
+    });
+    _editGoal = null;
+    refresh("goals");
+  }
+  else if (act === "ecancel") { _editGoal = null; refresh("goals"); }
 });
 
 // Кроки й підкроки — окремим делегованим обробником, щоб не плутати з діями цілі.
@@ -2552,9 +2653,15 @@ $("goal-list").addEventListener("click", e => {
   else if (btn.dataset.sact === "cancel") closeStepDraft();
 });
 $("goal-list").addEventListener("keydown", e => {
-  if (e.target.id !== "step-draft-input") return;
-  if (e.key === "Enter") { e.preventDefault(); commitStepDraft(); }
-  else if (e.key === "Escape") { e.stopPropagation(); closeStepDraft(); }
+  if (e.target.id === "step-draft-input") {
+    if (e.key === "Enter") { e.preventDefault(); commitStepDraft(); }
+    else if (e.key === "Escape") { e.stopPropagation(); closeStepDraft(); }
+    return;
+  }
+  const box = e.target.closest(".goal.edit");
+  if (!box) return;
+  if (e.key === "Enter") { e.preventDefault(); const b = box.querySelector('[data-gact="esave"]'); if (b) b.click(); }
+  else if (e.key === "Escape") { e.stopPropagation(); _editGoal = null; refresh("goals"); }
 });
 // ⚠️ change, не input: input перемальовував би список на кожній цифрі
 // й забирав фокус із поля, яке саме редагують.
@@ -2568,8 +2675,27 @@ $("open-list").addEventListener("click", e => {
   const box = e.target.closest("[data-task]");
   const btn = e.target.closest("[data-tact]");
   if (!box || !btn) return;
-  if (btn.dataset.tact === "done") completeTask(box.dataset.task);
-  else if (btn.dataset.tact === "del") deleteTask(box.dataset.task);
+  const act = btn.dataset.tact;
+  if (act === "done") completeTask(box.dataset.task);
+  else if (act === "del") deleteTask(box.dataset.task);
+  else if (act === "edit") {
+    _editTask = box.dataset.task;
+    refresh("open");
+    const i = $("open-list").querySelector(".task.edit .te-title");
+    if (i) { i.focus(); i.select(); }
+  }
+  else if (act === "esave") {
+    editTaskTitle(box.dataset.task, box.querySelector(".te-title").value);
+    _editTask = null;
+    refresh("open");
+  }
+  else if (act === "ecancel") { _editTask = null; refresh("open"); }
+});
+$("open-list").addEventListener("keydown", e => {
+  const box = e.target.closest(".task.edit");
+  if (!box) return;
+  if (e.key === "Enter") { e.preventDefault(); const b = box.querySelector('[data-tact="esave"]'); if (b) b.click(); }
+  else if (e.key === "Escape") { e.stopPropagation(); _editTask = null; refresh("open"); }
 });
 
 $("open-panel").addEventListener("click", e => {
