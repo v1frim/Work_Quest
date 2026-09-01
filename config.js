@@ -18,11 +18,24 @@ const WQ_SCHEMA = 1;
    Правка цього масиву НЕ впливає на вже створений реєстр.
    ─────────────────────────────────────────────────────────────────────────── */
 const DEFAULT_DIFFICULTIES = [
-  { id: "d_small",  name: "Дрібна",   icon: "🟢", color: "#7be07b", xp: 10,  order: 1, archived: false },
-  { id: "d_normal", name: "Звичайна", icon: "🔵", color: "#87b4ff", xp: 25,  order: 2, archived: false },
-  { id: "d_hard",   name: "Складна",  icon: "🟠", color: "#ffa94d", xp: 60,  order: 3, archived: false },
-  { id: "d_big",    name: "Велика",   icon: "🔴", color: "#ff6b6b", xp: 150, order: 4, archived: false }
+  { id: "d_instant", name: "Миттєва",  icon: "⚡", color: "#8fd3ff", xp: 5,   order: 1, archived: false },
+  { id: "d_small",   name: "Дрібна",   icon: "🟢", color: "#7be07b", xp: 10,  order: 2, archived: false },
+  { id: "d_easy",    name: "Проста",   icon: "🌿", color: "#2dd4bf", xp: 20,  order: 3, archived: false },
+  { id: "d_normal",  name: "Звичайна", icon: "🔵", color: "#87b4ff", xp: 35,  order: 4, archived: false },
+  { id: "d_notable", name: "Помітна",  icon: "🟣", color: "#c89bff", xp: 60,  order: 5, archived: false },
+  { id: "d_hard",    name: "Складна",  icon: "🟠", color: "#ffa94d", xp: 100, order: 6, archived: false },
+  { id: "d_big",     name: "Велика",   icon: "🔴", color: "#ff6b6b", xp: 180, order: 7, archived: false },
+  { id: "d_heavy",   name: "Важка",    icon: "⛏", color: "#d98f4b", xp: 320, order: 8, archived: false },
+  { id: "d_epic",    name: "Епічна",   icon: "💎", color: "#ffd166", xp: 600, order: 9, archived: false }
 ];
+
+/* Орієнтир за витраченим часом (сесія 1, запит користувача — «від суперлегких
+   за 10 хв до супертяжких на тижні»). Показується підказкою в налаштуваннях. */
+const DIF_HINTS = {
+  d_instant: "до 10 хв",  d_small: "до 30 хв",  d_easy: "близько години",
+  d_normal:  "2–3 години", d_notable: "півдня",  d_hard: "робочий день",
+  d_big:     "2–3 дні",    d_heavy: "тиждень",   d_epic: "тижні"
+};
 
 /* Палітра, яку пропонує кольоровий пікер при створенні нової складності.
    Усі кольори перевірені на контраст у всіх чотирьох фазах доби. */
@@ -104,6 +117,9 @@ const METRICS = {
   "tasks.doneByDiff.*":    { label: "Виконано за складністю", icon: "🎚", kind: "cumulative", expand: "difficulties" },
   "tasks.doneByTag.*":     { label: "Виконано за тегом",  icon: "🏷", kind: "cumulative", expand: "tags" },
 
+  "goals.done":            { label: "Цілей досягнуто",   icon: "🎯", kind: "cumulative", color: "#ffd166" },
+  "goals.open":            { label: "Цілей у роботі",    icon: "🎯", kind: "state" },
+
   /* — досвід — */
   "xp.total":              { label: "Досвід",             icon: "⚡", kind: "cumulative", color: "#ffd166", unit: "XP" },
   "xp.byDiff.*":           { label: "XP за складністю",   icon: "⚡", kind: "cumulative", expand: "difficulties", unit: "XP" },
@@ -157,7 +173,7 @@ const METRICS = {
 };
 
 /* Задача, дорожча за цей поріг, не враховується в best.dayXpFair. */
-const EPIC_XP_CUTOFF = 100;
+const EPIC_XP_CUTOFF = 150;
 
 /* Метрики, які показує оверлей рекордів і за якими вітають із побиттям. */
 const RECORD_KEYS = [
@@ -200,8 +216,11 @@ const ACHIEVEMENTS = [
   { id: "a_plan",   icon: "🎯", title: "За планом",       desc: "Днів, коли денний план виконано",
     metric: "days.planMet",    tiers: [5, 20, 60, 150, 300, 600] },
 
-  { id: "a_big",    icon: "💎", title: "Важкоатлет",      desc: "Виконано «Великих» задач",
-    metric: "tasks.doneByDiff.d_big", tiers: [1, 5, 15, 40, 100, 250] },
+  { id: "a_big",    icon: "💎", title: "Важкоатлет",      desc: "Виконано «Епічних» задач",
+    metric: "tasks.doneByDiff.d_epic", tiers: [1, 3, 10, 25, 60, 150] },
+
+  { id: "a_goals",  icon: "🎯", title: "Цілеспрямований",  desc: "Досягнуто цілей",
+    metric: "goals.done",      tiers: [1, 5, 15, 40, 100, 250] },
 
   { id: "a_early",  icon: "🌅", title: "Рання пташка",    desc: "Задач, закритих до 10:00",
     metric: "hours.early",     tiers: [10, 40, 120, 300, 700, 1500] },
@@ -269,6 +288,8 @@ const WQ_TEXT = {
 
   setTitle:      "⚙️ Налаштування",
   setDifs:       "Складності",
+  goalNew:       "🎯 Нова ціль",
+  goalDone:      "ЦІЛЬ ДОСЯГНУТО",
   setDifXpHint:  "Нове значення діє лише на майбутні виконання; уже виконані задачі зберігають свій XP",
   setPlans:      "Плани",
   setSound:      "Звук",

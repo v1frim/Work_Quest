@@ -372,7 +372,7 @@ h1 {
 }
 #xp-section:hover { background: rgba(255,209,102,0.07); }
 
-#levels-overlay, #records-overlay {
+#levels-overlay, #records-overlay, #settings-overlay, #goal-modal {
   position: fixed; inset: 0; z-index: 300;
   display: flex; align-items: center; justify-content: center; padding: 24px;
   background: var(--scrim);
@@ -450,6 +450,127 @@ h1 {
 .lvl-you  { display: block; margin-top: 1px; font-size: 11px; font-weight: 600; color: var(--lg2); }
 .lvl-xp   { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--tx-3); white-space: nowrap; }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   E3. ПРОГРЕС ПО ДНЯХ · ЦІЛІ · ЗАДАЧІ В РОБОТІ · НАЛАШТУВАННЯ · ТОСТ
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* — рядок дня — */
+.prog-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 4px; border-bottom: var(--bd-row);
+}
+.prog-row.today { background: rgba(255,209,102,0.06); border-radius: var(--r-sm); }
+.prog-date { flex: 0 0 62px; font-size: 12px; color: var(--tx-3); }
+.prog-cells { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+/* Комірка складності: тінт поверх соліда + кольорова межа — читається на будь-якій фазі доби */
+.pgc {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px; border-radius: var(--r-pill); font-size: 11px; font-weight: 700;
+  color: var(--c); background: var(--c-t); border: 1px solid var(--c-b);
+}
+.prog-xp {
+  flex: 0 0 auto; font-size: 12px; font-weight: 700; color: var(--gold);
+  padding-left: 8px; border-left: var(--bd-accent);
+}
+.prog-sect {
+  margin: 14px 0 6px; font-size: 10px; letter-spacing: 1.6px; color: var(--tx-6);
+}
+
+/* — секції правої колонки — */
+.sec-h {
+  display: flex; align-items: center; gap: 8px;
+  margin: 4px 0 8px; font-size: 12px; letter-spacing: 1.2px; color: var(--tx-4);
+}
+.sec-h .add {
+  margin-left: auto; cursor: pointer; font-family: inherit; font-size: 12px;
+  color: var(--gold); background: var(--solid-btn);
+  border: var(--bd-accent); border-radius: var(--r-pill); padding: 2px 10px;
+  transition: background-color var(--t-fast) ease;
+}
+.sec-h .add:hover { background: var(--solid-btn-hov); }
+
+/* — ціль — */
+.goal {
+  padding: 9px 11px; margin-bottom: 8px;
+  background: var(--solid-btn); border: var(--bd-ghost); border-left: 3px solid var(--gold);
+  border-radius: var(--r-btn);
+}
+.goal.done { border-left-color: var(--st-done); opacity: 0.6; }
+.goal-top { display: flex; align-items: center; gap: 8px; }
+.goal-t   { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 700; color: var(--tx-1); }
+.goal.done .goal-t { text-decoration: line-through; }
+.goal-xp  { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--gold); }
+.goal-bar { height: 6px; margin: 7px 0 5px; border-radius: var(--r-pill); background: rgba(255,255,255,0.09); overflow: hidden; }
+.goal-fill{ height: 100%; border-radius: var(--r-pill); background: var(--grad-gold); transition: width var(--t-data) ease; }
+.goal.done .goal-fill { background: linear-gradient(180deg, #a8f0a8, var(--st-done)); }
+.goal-ctl { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--tx-4); }
+.goal-num {
+  width: 62px; padding: 2px 6px; font-family: inherit; font-size: 12px;
+  color: var(--tx); background: rgba(0,0,0,0.35);
+  border: var(--bd-ghost); border-radius: var(--r-sm); outline: none;
+}
+.goal-num:focus { border-color: var(--gold); }
+.mini {
+  cursor: pointer; font-family: inherit; font-size: 12px; line-height: 1;
+  color: var(--tx-3); background: var(--solid-btn);
+  border: var(--bd-ghost); border-radius: var(--r-sm); padding: 3px 7px;
+  transition: color var(--t-fast) ease, border-color var(--t-fast) ease;
+}
+.mini:hover { color: var(--gold); border-color: rgba(255,209,102,0.4); }
+.mini.dz { margin-left: auto; }
+
+/* — задача в роботі — */
+.task {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; margin-bottom: 6px;
+  background: var(--solid-btn); border: var(--bd-ghost); border-left: 3px solid var(--c);
+  border-radius: var(--r-btn);
+}
+.task-t { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--tx-1); }
+.task-x { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--c); }
+
+/* — налаштування — */
+.set-sect { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--gold); }
+.set-note { margin: -4px 0 12px; font-size: 11px; color: var(--tx-5); line-height: 1.5; }
+.set-block { margin-bottom: 26px; }
+.dif-edit {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--c-b); border-radius: var(--r-btn);
+}
+.dif-edit.arch { opacity: 0.5; }
+.f-ic  { width: 42px; text-align: center; }
+.f-nm  { flex: 1 1 auto; min-width: 0; }
+.f-xp  { width: 74px; text-align: right; }
+.fld {
+  padding: 5px 8px; font-family: inherit; font-size: 13px;
+  color: var(--tx); background: rgba(0,0,0,0.35);
+  border: var(--bd-ghost); border-radius: var(--r-sm); outline: none;
+}
+.fld:focus { border-color: var(--gold); }
+.f-col {
+  width: 34px; height: 28px; padding: 0; cursor: pointer;
+  background: none; border: var(--bd-ghost); border-radius: var(--r-sm);
+}
+.row2 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--tx-2); }
+.row2 .fld { width: 90px; }
+
+/* — тост — */
+#toast {
+  position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 400;
+  display: flex; flex-direction: column-reverse; gap: 8px; align-items: center;
+  pointer-events: none;
+}
+.toast-i {
+  padding: 9px 18px; font-size: 14px; font-weight: 700; color: var(--on-gold);
+  background: var(--grad-gold); border-radius: var(--r-pill);
+  box-shadow: var(--sh-cta);
+  animation: toastIn 0.25s ease;
+}
+.toast-i.big { font-size: 16px; padding: 12px 24px; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    F. ⚠️ ПАРНІ ПРАВИЛА .hidden — БЛОК ОБОВ'ЯЗКОВИЙ
    .hidden має специфічність (0,0,1,0), тож будь-яке правило з ID, що задає
@@ -464,6 +585,9 @@ h1 {
 #bottom-left-btns.hidden { display: none; }
 #levels-overlay.hidden    { display: none; }
 #records-overlay.hidden   { display: none; }
+#settings-overlay.hidden  { display: none; }
+#goal-modal.hidden        { display: none; }
+#toast.hidden             { display: none; }
 #open-panel.hidden        { display: none; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -525,9 +649,14 @@ h1 {
 
   <!-- ПРАВА: поточні задачі (рішення сесії 1 — рекорди переїхали в оверлей) -->
   <aside class="panel" id="open-panel">
-    <div class="panel-h" id="open-h">📋 Поточні задачі</div>
-    <div class="panel-sub">Те, що в роботі й ще не закрито</div>
-    <div class="scroll" id="open-list"></div>
+    <div class="panel-h">🎯 Цілі та задачі</div>
+    <div class="panel-sub">Довгі цілі з прогресом і те, що зараз у роботі</div>
+    <div class="scroll">
+      <div class="sec-h">ЦІЛІ<button class="add" id="goal-add">+ ціль</button></div>
+      <div id="goal-list"></div>
+      <div class="sec-h" id="open-h">У РОБОТІ<button class="add" id="task-add">+ задача</button></div>
+      <div id="open-list"></div>
+    </div>
   </aside>
 
 </div>
@@ -583,6 +712,47 @@ h1 {
     </div>
   </div>
 </div>
+
+<!-- ═══ ОВЕРЛЕЙ «НАЛАШТУВАННЯ» ═══ -->
+<div id="settings-overlay" class="hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div>
+        <h2>⚙️ Налаштування</h2>
+        <span class="sh-sub">складності, плани, дані</span>
+      </div>
+      <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
+    </div>
+    <div class="sheet-body" id="set-body"></div>
+  </div>
+</div>
+
+<!-- ═══ МОДАЛКА «НОВА ЦІЛЬ» ═══ -->
+<div id="goal-modal" class="hidden">
+  <div class="sheet" style="height:auto;max-height:86vh">
+    <div class="sheet-head">
+      <div><h2>🎯 Нова ціль</h2><span class="sh-sub">із прогресом і XP за виконання</span></div>
+      <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="row2"><span style="flex:0 0 110px">Назва</span>
+        <input class="fld" id="g-title" style="flex:1 1 auto;width:auto" placeholder="Знайти 10 товарів"></div>
+      <div class="row2"><span style="flex:0 0 110px">Скільки треба</span>
+        <input class="fld" id="g-target" type="number" min="1" step="1" value="10">
+        <span style="color:var(--tx-4)">одиниця</span>
+        <input class="fld" id="g-unit" style="width:70px" placeholder="шт"></div>
+      <div class="row2"><span style="flex:0 0 110px">Вже є</span>
+        <input class="fld" id="g-current" type="number" min="0" step="1" value="0"></div>
+      <div class="row2"><span style="flex:0 0 110px">XP за виконання</span>
+        <input class="fld" id="g-xp" type="number" min="0" step="5" value="200"></div>
+      <div class="row2" style="margin-top:16px">
+        <button class="act" id="g-save" style="width:auto">Створити ціль</button>
+        <button class="mini" data-act="close">Скасувати</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
      РАННІЙ СКРИПТ — виконується ДО config.js і головного скрипта.
@@ -653,6 +823,7 @@ var LS_OK = (function () {
 const WQ_KEYS = {
   meta:      { key: "workquest_meta_v1",         klass: "data" },
   tasks:     { key: "workquest_tasks_v1",        klass: "data" },
+  goals:     { key: "workquest_goals_v1",        klass: "data" },
   difs:      { key: "workquest_difficulties_v1", klass: "data" },
   plan:      { key: "workquest_plan_v1",         klass: "data" },
   ach:       { key: "workquest_ach_v1",          klass: "data" },
@@ -694,24 +865,58 @@ function loadJSON(key, def) {
   try { const v = JSON.parse(raw); return v === null ? def : v; }
   catch (e) { console.error("[storage] битий JSON у " + key, e); return def; }
 }
-function loadTasks() { const a = loadJSON(K.tasks, []); return Array.isArray(a) ? a : []; }
+function saveJSON(key, val) { return lsSet(key, JSON.stringify(val)); }
 
-/* ⚠️ ЄДИНЕ джерело XP у проєкті — сума ЗАМОРОЖЕНИХ xpAwarded.
-   Ключа workquest_xp_v1 не існує і не має існувати: інакше зміна XP у реєстрі
-   складностей заднім числом переписала б усю історію. */
-function totalXp() {
-  return loadTasks().reduce((s, t) => s + (typeof t.xpAwarded === "number" ? t.xpAwarded : 0), 0);
+/* ─── §1 · ДАТИ ─────────────────────────────────────────────────────────────
+   ⚠️ ЄДИНЕ джерело «сьогодні» на весь проєкт, і воно ЛОКАЛЬНЕ.
+   toISOString().slice(0,10) дав би UTC: для Києва з 00:00 до 03:00 день і
+   МІСЯЦЬ вважались би попередніми. Заборонено; ловить греп у check-config.js. */
+function fmtKey(d) {
+  return d.getFullYear() + "-" +
+         String(d.getMonth() + 1).padStart(2, "0") + "-" +
+         String(d.getDate()).padStart(2, "0");
 }
+// Межа доби: 0 = календарна північ (рішення сесії 1). Значення 4 означало б
+// «моя доба закінчується о 04:00»: задача о 02:00 пішла б у вчорашній день.
+function dayShifted(d) {
+  const h = (loadPlan().dayCutHour | 0);
+  if (!h) return d;
+  const x = new Date(d.getTime());
+  x.setHours(x.getHours() - h);
+  return x;
+}
+function todayKey() { return fmtKey(dayShifted(new Date())); }
+function dayKeyOf(ts) { return fmtKey(dayShifted(new Date(ts))); }
+
+// ⚠️ Голий "2026-08-31" парситься як UTC-північ — звідси "T00:00:00".
+function parseKey(k) { return new Date(k + "T00:00:00"); }
+// Цілочисельний номер доби: уся арифметика днів іде через нього. Порівнювати
+// різницю з 1 напряму не можна — доба буває 23 або 25 годин через перехід часу.
+function dayNum(k) { return Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10)) / 86400000; }
+function keyFromNum(n) {
+  const d = new Date(n * 86400000);
+  return d.getUTCFullYear() + "-" +
+         String(d.getUTCMonth() + 1).padStart(2, "0") + "-" +
+         String(d.getUTCDate()).padStart(2, "0");
+}
+// Понеділок тижня, до якого належить день — як цілий номер доби.
+function weekNum(k) { const n = dayNum(k); return n - ((n + 3) % 7); }
+function monthKey(k) { return k.slice(0, 7); }
+
+function fmtDay(k)   { return k.slice(8, 10) + " " + MONTH_SHORT[+k.slice(5, 7) - 1]; }
+function fmtMonth(k) { return MONTH_NAMES[+k.slice(5, 7) - 1] + " " + k.slice(0, 4); }
+function fmtRange(a, b) { return fmtDay(a) + " – " + fmtDay(b); }
 
 /* ─── §2 · ДРІБНІ ХЕЛПЕРИ ───────────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
 
-// ⚠️ Назву й нотатку задачі вводить користувач — у DOM лише через esc().
+// ⚠️ Назву задачі й цілі вводить користувач — у DOM лише через esc()/escAttr().
 function esc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
+const escAttr = esc;
 
 // Колір складності задає користувач пікером, а тінт і бордер потрібні окремо.
 // Без цього кольорову кнопку на змінному фоні доби зробити не можна.
@@ -722,22 +927,80 @@ function hexToRgba(hex, a) {
   if (!isFinite(n) || v.length !== 6) return "rgba(255,255,255," + a + ")";
   return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
 }
+// Розряди вузьким нерозривним пробілом: 252 000 не переноситься і не злипається.
+function fmtXpNum(n) { return String(Math.round(n) | 0).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+function plural(n, one, few, many) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
+function rid(p) { return p + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 5); }
 
-/* ─── §5 · РІВНІ ────────────────────────────────────────────────────────────
+/* ─── §3 · СХОВИЩЕ СУТНОСТЕЙ ────────────────────────────────────────────── */
+function loadTasks() { const a = loadJSON(K.tasks, []); return Array.isArray(a) ? a : []; }
+function saveTasks(a) { return saveJSON(K.tasks, a); }
+function loadGoals() { const a = loadJSON(K.goals, []); return Array.isArray(a) ? a : []; }
+function saveGoals(a) { return saveJSON(K.goals, a); }
+function loadDifs() {
+  const a = loadJSON(K.difs, null);
+  if (!Array.isArray(a) || !a.length) return DEFAULT_DIFFICULTIES.map(d => Object.assign({}, d));
+  return a;
+}
+function saveDifs(a) { return saveJSON(K.difs, a); }
+function loadPlan() { return Object.assign({}, DEFAULT_PLAN, loadJSON(K.plan, {})); }
+function savePlan(p) { return saveJSON(K.plan, p); }
+
+// Поліморфні читачі: зміна формату не потребує бампу версії ключа —
+// старі бекапи читаються без міграції.
+const tDone = t => (typeof t.doneAt === "number" && t.doneAt > 0);
+const tXp   = t => (typeof t.xpAwarded === "number" ? t.xpAwarded : 0);
+const gDone = g => (typeof g.doneAt === "number" && g.doneAt > 0);
+const gXp   = g => (typeof g.xpAwarded === "number" ? g.xpAwarded : 0);
+
+/* ─── §4 · САНІТАР ──────────────────────────────────────────────────────────
+   Ідемпотентний, без прапора, ганяється при кожному завантаженні. Лікує
+   записи, що порушують інваріанти: виконана задача мусить мати РАЗОМ
+   doneAt + doneDay + xpAwarded, невиконана — жодного з них.               */
+function sanitizeData() {
+  let fixed = 0;
+  const tasks = loadTasks();
+  for (const t of tasks) {
+    if (!t.id) { t.id = rid("t_"); fixed++; }
+    if (typeof t.createdAt !== "number") { t.createdAt = t.doneAt || Date.now(); fixed++; }
+    if (tDone(t)) {
+      if (!t.doneDay) { t.doneDay = dayKeyOf(t.doneAt); fixed++; }
+      if (typeof t.xpAwarded !== "number") { t.xpAwarded = 0; fixed++; }
+    } else if (t.doneDay || t.xpAwarded != null || t.difSnap) {
+      t.doneDay = null; t.xpAwarded = null; t.difSnap = null; fixed++;
+    }
+  }
+  if (fixed) saveTasks(tasks);
+
+  let gf = 0;
+  const goals = loadGoals();
+  for (const g of goals) {
+    if (!g.id) { g.id = rid("g_"); gf++; }
+    if (typeof g.target !== "number" || g.target <= 0) { g.target = 1; gf++; }
+    if (typeof g.current !== "number" || g.current < 0) { g.current = 0; gf++; }
+    if (gDone(g) && !g.doneDay) { g.doneDay = dayKeyOf(g.doneAt); gf++; }
+  }
+  if (gf) saveGoals(goals);
+}
+
+/* ─── §4b · РІВНІ ───────────────────────────────────────────────────────────
    Рівень НІКОЛИ не зберігається — завжди обчислюється з xp.total. Саме тому
-   криву LEVELS можна перекалібрувати будь-коли без міграції даних.          */
+   криву LEVELS можна перекалібрувати будь-коли без міграції даних.
 
-// Кожна ліга — 10 рівнів, тож рівень усередині ліги отримує римський номер:
-// «Новачок I» … «Новачок X», далі «Підмайстер I». Так у кожного зі 100 рівнів
-// є власне ім'я, і при цьому не треба вигадувати 100 назв.
+   Кожна ліга — 10 рівнів, тож рівень усередині ліги отримує римський номер:
+   «Новачок I» … «Новачок X», далі «Підмайстер I». Так у кожного зі 100 рівнів
+   є власне ім'я, і при цьому не треба вигадувати 100 назв.                */
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 const PER_LEAGUE = Math.max(1, Math.round(LEVELS.length / LEAGUES.length));
 
 function leagueOf(n) { return LEAGUES[Math.min(LEAGUES.length - 1, Math.floor((n - 1) / PER_LEAGUE))]; }
 function levelName(n) { return leagueOf(n).name + " " + (ROMAN[(n - 1) % PER_LEAGUE] || ""); }
-
-// Розряди — вузьким нерозривним пробілом: 252 000 не переноситься і не злипається.
-function fmtXpNum(n) { return String(n | 0).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f"); }
 
 function getLevelInfo(xp) {
   let i = 0;
@@ -755,24 +1018,385 @@ function getLevelInfo(xp) {
   };
 }
 
+/* ─── §5 · S() — ЄДИНИЙ ОБЧИСЛЮВАЧ ─────────────────────────────────────────
+   ⚠️ Жоден рендер, жодне досягнення, жоден рекорд не читає localStorage сам.
+   Усе через S(). Кеш скидає bumpStats() — перший рядок commit(), тобто
+   в ОДНОМУ місці на весь проєкт.                                          */
+let _statsCache = null;
+function bumpStats() { _statsCache = null; }
+function S() { if (!_statsCache) _statsCache = computeStats(); return _statsCache; }
+
+function computeStats() {
+  const tasks = loadTasks();
+  const goals = loadGoals();
+  const plan = loadPlan();
+  const today = todayKey();
+
+  const dayMap = {};                     // dayKey → {done, xp, byDif:{}, goals}
+  const dayRow = k => dayMap[k] || (dayMap[k] = { done: 0, xp: 0, byDif: {}, goals: 0 });
+
+  let done = 0, xpTotal = 0, open = 0;
+  const doneByDiff = {}, xpByDiff = {}, doneByTag = {}, weekdaySum = [0,0,0,0,0,0,0];
+  let early = 0, late = 0, bestTaskXp = 0;
+
+  for (const t of tasks) {
+    if (!tDone(t)) { open++; continue; }
+    done++;
+    const xp = tXp(t);
+    xpTotal += xp;
+    if (xp > bestTaskXp) bestTaskXp = xp;
+    doneByDiff[t.difficultyId] = (doneByDiff[t.difficultyId] || 0) + 1;
+    xpByDiff[t.difficultyId] = (xpByDiff[t.difficultyId] || 0) + xp;
+    for (const tag of (Array.isArray(t.tags) ? t.tags : [])) doneByTag[tag] = (doneByTag[tag] || 0) + 1;
+    const h = new Date(t.doneAt).getHours();
+    if (h < 10) early++;
+    if (h >= 20) late++;
+    const k = t.doneDay;
+    if (!k) continue;
+    const r = dayRow(k);
+    r.done++; r.xp += xp;
+    r.byDif[t.difficultyId] = (r.byDif[t.difficultyId] || 0) + 1;
+  }
+
+  // ⚠️ Цілі дають XP так само, як задачі, і теж заморожують xpAwarded.
+  // xp.total = Σ по ОБОХ журналах; окремого ключа XP у сховищі не існує.
+  let goalsDone = 0, goalsOpen = 0;
+  for (const g of goals) {
+    if (!gDone(g)) { goalsOpen++; continue; }
+    goalsDone++;
+    const xp = gXp(g);
+    xpTotal += xp;
+    const k = g.doneDay;
+    if (!k) continue;
+    const r = dayRow(k);
+    r.xp += xp; r.goals++;
+  }
+
+  const keys = Object.keys(dayMap).sort();
+  const first = keys[0] || null;
+  const last = keys[keys.length - 1] || null;
+
+  // Серії: сусідство днів — тільки через цілі номери діб.
+  let bestStreak = 0, bestEnd = null, run = 0, prev = null;
+  for (const k of keys) {
+    const n = dayNum(k);
+    run = (prev !== null && n - prev === 1) ? run + 1 : 1;
+    if (run > bestStreak) { bestStreak = run; bestEnd = k; }
+    prev = n;
+  }
+  let cur = 0;
+  if (last === today) {
+    cur = 1;
+    for (let i = keys.length - 2; i >= 0; i--) {
+      if (dayNum(keys[i + 1]) - dayNum(keys[i]) === 1) cur++; else break;
+    }
+  }
+
+  // Рекорди днів
+  let bDone = 0, bDoneAt = null, bXp = 0, bXpAt = null, planMet = 0;
+  for (const k of keys) {
+    const r = dayMap[k];
+    if (r.done > bDone) { bDone = r.done; bDoneAt = k; }
+    if (r.xp > bXp) { bXp = r.xp; bXpAt = k; }
+    if (r.done >= (plan.perDay | 0)) planMet++;
+    weekdaySum[parseKey(k).getDay()] += r.done;
+  }
+
+  // ⚠️ «Чесний» рекорд XP за день: одна епічна задача не має робити планку
+  // недосяжною назавжди, тож задачі дорожчі за EPIC_XP_CUTOFF тут не рахуються.
+  const fairDays = {};
+  for (const t of tasks) {
+    if (!tDone(t) || !t.doneDay) continue;
+    if (tXp(t) > EPIC_XP_CUTOFF) continue;
+    fairDays[t.doneDay] = (fairDays[t.doneDay] || 0) + tXp(t);
+  }
+  let bXpFair = 0, bXpFairAt = null;
+  for (const k of Object.keys(fairDays)) if (fairDays[k] > bXpFair) { bXpFair = fairDays[k]; bXpFairAt = k; }
+
+  // Місяці й тижні
+  const months = {}, weeks = {};
+  for (const k of keys) {
+    const r = dayMap[k];
+    const m = months[monthKey(k)] || (months[monthKey(k)] = { done: 0, xp: 0, byDif: {}, goals: 0 });
+    const w = weeks[weekNum(k)] || (weeks[weekNum(k)] = { done: 0, xp: 0, byDif: {}, goals: 0 });
+    for (const agg of [m, w]) {
+      agg.done += r.done; agg.xp += r.xp; agg.goals += r.goals;
+      for (const id of Object.keys(r.byDif)) agg.byDif[id] = (agg.byDif[id] || 0) + r.byDif[id];
+    }
+  }
+  let bMonthDone = 0, bMonthXp = 0;
+  for (const m of Object.values(months)) {
+    if (m.done > bMonthDone) bMonthDone = m.done;
+    if (m.xp > bMonthXp) bMonthXp = m.xp;
+  }
+  let bWeekDone = 0, bWeekXp = 0;
+  for (const w of Object.values(weeks)) {
+    if (w.done > bWeekDone) bWeekDone = w.done;
+    if (w.xp > bWeekXp) bWeekXp = w.xp;
+  }
+
+  // ⚠️ Дільник КАЛЕНДАРНИЙ (вимога ТЗ): дні без активності теж рахуються.
+  const calDays = first ? (dayNum(today) - dayNum(first) + 1) : 0;
+  const activeDays = keys.length;
+  const monthsPassed = first
+    ? ((+today.slice(0, 4) - +first.slice(0, 4)) * 12 + (+today.slice(5, 7) - +first.slice(5, 7)) + 1)
+    : 0;
+
+  // ⚠️ Найпродуктивніший день тижня — за СЕРЕДНІМ, не за сумою: суму виграє
+  // день, якого просто більше минуло (5 понеділків проти 4 субот).
+  const weekdayCount = [0,0,0,0,0,0,0];
+  if (first) {
+    for (let n = dayNum(first); n <= dayNum(today); n++) weekdayCount[parseKey(keyFromNum(n)).getDay()]++;
+  }
+  const weekdayAvg = weekdaySum.map((v, i) => (weekdayCount[i] ? v / weekdayCount[i] : 0));
+  let wdBest = -1, wdBestV = 0;
+  for (let i = 0; i < 7; i++) if (weekdayAvg[i] > wdBestV) { wdBestV = weekdayAvg[i]; wdBest = i; }
+
+  const t0 = dayMap[today] || { done: 0, xp: 0, byDif: {}, goals: 0 };
+  const yKey = keyFromNum(dayNum(today) - 1);
+  const y0 = dayMap[yKey] || { done: 0, xp: 0 };
+  const mNow = months[monthKey(today)] || { done: 0, xp: 0 };
+  const wNow = weeks[weekNum(today)] || { done: 0, xp: 0 };
+
+  const lvl = getLevelInfo(xpTotal);
+  const basisToday = plan.basis === "xp" ? t0.xp : t0.done;
+  const goalDay = plan.basis === "xp" ? (plan.perDay * 25) : plan.perDay;
+
+  return {
+    dayMap, weeks, months, dayKeys: keys,
+    tasks: { done, open, total: tasks.length, doneByDiff, openByDiff: {}, doneByTag },
+    goals: { done: goalsDone, open: goalsOpen, total: goals.length },
+    xp: { total: xpTotal, byDiff: xpByDiff },
+    days: { active: activeDays, calendar: calDays, first, last, planMet },
+    today: { done: t0.done, xp: t0.xp, goals: t0.goals },
+    yesterday: { done: y0.done },
+    week: { done: wNow.done, xp: wNow.xp },
+    month: { done: mNow.done, xp: mNow.xp, daysPassed: +today.slice(8, 10) },
+    streak: { current: cur, best: bestStreak, bestEnd, atRisk: t0.done === 0 && y0.done > 0 },
+    best: {
+      dayDone: bDone, dayDoneAt: bDoneAt, dayXp: bXp, dayXpAt: bXpAt,
+      dayXpFair: bXpFair, dayXpFairAt: bXpFairAt,
+      weekDone: bWeekDone, weekXp: bWeekXp,
+      monthDone: bMonthDone, monthXp: bMonthXp, taskXp: bestTaskXp
+    },
+    avg: {
+      donePerCalendarDay: calDays ? done / calDays : 0,
+      donePerActiveDay: activeDays ? done / activeDays : 0,
+      xpPerCalendarDay: calDays ? xpTotal / calDays : 0,
+      donePerMonth: monthsPassed ? done / monthsPassed : 0,
+      xpPerMonth: monthsPassed ? xpTotal / monthsPassed : 0
+    },
+    weekday: { avgDone: weekdayAvg, best: { idx: wdBest, name: wdBest >= 0 ? WEEKDAY_NAMES[wdBest] : "—", avg: wdBestV } },
+    hours: { early, late },
+    level: lvl,
+    plan: {
+      perDay: plan.perDay, perMonth: plan.perMonth, basis: plan.basis,
+      dayPct: goalDay ? Math.min(100, (basisToday / goalDay) * 100) : 0,
+      monthPct: plan.perMonth ? Math.min(100, (mNow.done / plan.perMonth) * 100) : 0
+    }
+  };
+}
+
+// Псевдоніми, щоб крапкові шляхи з METRICS резолвились: days.active тощо.
+function metricValue(key) {
+  let cur = S();
+  for (const seg of key.split(".")) { if (cur == null) return 0; cur = cur[seg]; }
+  // ⚠️ 0, а не undefined: «ще нема даних» не має ламати ні смужку (width:NaN%),
+  // ні порівняння рекорду.
+  return (typeof cur === "number") ? cur : (cur == null ? 0 : cur);
+}
+
+/* ─── §6 · РЕЄСТР СКЛАДНОСТЕЙ ───────────────────────────────────────────────
+   ⚠️ Живий реєстр виграє ЗАВЖДИ; difSnap — лише для того, чого в реєстрі
+   більше немає. Інакше після перейменування складності той самий рядок дня
+   показував би дві різні назви.                                           */
+function getDif(id, snap) {
+  const d = loadDifs().find(x => x.id === id);
+  if (d) return d;
+  if (snap) return Object.assign({}, DIF_MISSING, snap, { id, missing: true });
+  return Object.assign({}, DIF_MISSING, { id });
+}
+function activeDifs() {
+  return loadDifs().filter(d => !d.archived).sort((a, b) => (a.order | 0) - (b.order | 0));
+}
+
+/* ─── §7 · ДІЇ ──────────────────────────────────────────────────────────── */
+
+// Головна дія продукту: назва + складність = задача створена й одразу закрита.
+function addDone(title, difId) {
+  const t = String(title || "").trim().slice(0, 200);
+  if (!t) return false;
+  const d = getDif(difId);
+  const now = Date.now();
+  const tasks = loadTasks();
+  tasks.push({
+    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [],
+    createdAt: now,
+    doneAt: now,
+    // ⚠️ Межа доби вирішується ОДИН раз, у момент події. Обчислення на льоту
+    // «попливло б» ретроспективно при переїзді в інший пояс або зміні dayCutHour.
+    doneDay: dayKeyOf(now),
+    // ⚠️ ЗНІМОК: зміна XP у реєстрі складностей діє лише на МАЙБУТНІ виконання.
+    xpAwarded: d.xp | 0,
+    difSnap: { name: d.name, color: d.color, icon: d.icon }
+  });
+  saveTasks(tasks);
+  lsSet(K.lastDif, difId);
+  commit();
+  toast("+" + (d.xp | 0) + " XP · " + d.name);
+  return true;
+}
+
+// Планова задача: створюється відкритою, закривається пізніше.
+function addOpen(title, difId) {
+  const t = String(title || "").trim().slice(0, 200);
+  if (!t) return false;
+  const tasks = loadTasks();
+  tasks.push({
+    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [],
+    createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null, difSnap: null
+  });
+  saveTasks(tasks);
+  commit();
+  return true;
+}
+
+function completeTask(id) {
+  const tasks = loadTasks();
+  const t = tasks.find(x => x.id === id);
+  if (!t || tDone(t)) return;
+  const d = getDif(t.difficultyId);
+  const now = Date.now();
+  t.doneAt = now;
+  t.doneDay = dayKeyOf(now);
+  t.xpAwarded = d.xp | 0;
+  t.difSnap = { name: d.name, color: d.color, icon: d.icon };
+  saveTasks(tasks);
+  commit();
+  toast("+" + (d.xp | 0) + " XP · " + d.name);
+}
+
+// ⚠️ Симетрія: знімаємо РІВНО стільки, скільки дали. Ніколи не поточний d.xp —
+// інакше зміна реєстру складностей перетворилась би на фарм XP.
+function uncompleteTask(id) {
+  const tasks = loadTasks();
+  const t = tasks.find(x => x.id === id);
+  if (!t || !tDone(t)) return;
+  t.doneAt = null; t.doneDay = null; t.xpAwarded = null; t.difSnap = null;
+  saveTasks(tasks);
+  commit();
+}
+function deleteTask(id) {
+  const tasks = loadTasks();
+  const i = tasks.findIndex(x => x.id === id);
+  if (i < 0) return;
+  if (tDone(tasks[i]) && !confirm("Видалити виконану задачу? XP за неї буде знято.")) return;
+  tasks.splice(i, 1);
+  saveTasks(tasks);
+  commit();
+}
+
+/* — цілі — */
+function addGoal(title, target, unit, xp, current) {
+  const t = String(title || "").trim().slice(0, 200);
+  if (!t) return false;
+  const goals = loadGoals();
+  goals.push({
+    id: rid("g_"), title: t, note: "",
+    target: Math.max(1, target | 0), current: Math.max(0, current | 0),
+    unit: String(unit || "").trim().slice(0, 12),
+    xp: Math.max(0, xp | 0),
+    createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null
+  });
+  saveGoals(goals);
+  commit();
+  return true;
+}
+// Прогрес цілі. Досягнення цілі закриває її автоматично й нараховує XP —
+// той самий принцип заморозки, що й у задач.
+function setGoalProgress(id, value) {
+  const goals = loadGoals();
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+  g.current = Math.max(0, Math.min(g.target, Math.round(value) || 0));
+  let hit = false;
+  if (!gDone(g) && g.current >= g.target) {
+    const now = Date.now();
+    g.doneAt = now;
+    g.doneDay = dayKeyOf(now);
+    g.xpAwarded = g.xp | 0;      // ⚠️ ЗНІМОК, як і в задачі
+    hit = true;
+  }
+  saveGoals(goals);
+  commit();
+  if (hit) toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+}
+function reopenGoal(id) {
+  const goals = loadGoals();
+  const g = goals.find(x => x.id === id);
+  if (!g || !gDone(g)) return;
+  g.doneAt = null; g.doneDay = null; g.xpAwarded = null;   // XP знімається рівно той, що дали
+  if (g.current >= g.target) g.current = Math.max(0, g.target - 1);
+  saveGoals(goals);
+  commit();
+}
+function deleteGoal(id) {
+  const goals = loadGoals();
+  const i = goals.findIndex(x => x.id === id);
+  if (i < 0) return;
+  if (!confirm("Видалити ціль" + (gDone(goals[i]) ? "? XP за неї буде знято." : "?"))) return;
+  goals.splice(i, 1);
+  saveGoals(goals);
+  commit();
+}
+
+/* ─── §8 · ТОСТ ─────────────────────────────────────────────────────────── */
+function toast(text, big) {
+  const el = document.createElement("div");
+  el.className = "toast-i" + (big ? " big" : "");
+  el.textContent = text;
+  $("toast").appendChild(el);
+  setTimeout(() => el.remove(), big ? 3200 : 1900);
+}
+
+/* ─── §9 · ПЕРЕВІРКИ ────────────────────────────────────────────────────── */
+// ⚠️ _prevLevel === null на першому виклику: без цього кожне завантаження
+// сторінки святкувало б поточний рівень заново.
+let _prevLevel = null;
+function checkLevelUp() {
+  const n = S().level.n;
+  if (_prevLevel !== null && n > _prevLevel) {
+    lsSet(K.levelupAt, String(Date.now()));
+    toast("🎉 " + WQ_TEXT.lvlUp + " " + n + " · " + S().level.name, true);
+  }
+  _prevLevel = n;
+}
+
 /* ─── §10 · РЕНДЕР ──────────────────────────────────────────────────────────
    ⚠️ Реєстр зон. Додав панель → дописав СЮДИ, а не в обробники. У еталоні
-   панель тихо не оновлювалась, бо в одному з обробників забули рядок.
-   Етап 0 малює статичний каркас із реєстрів; дані з'являться на етапі 1.   */
+   панель тихо не оновлювалась, бо в одному з обробників забули рядок.      */
 const RENDER = {
   today:  renderToday,
   xp:     renderXp,
   difs:   renderDifRow,
   totals: renderTotals,
   days:   renderDays,
+  goals:  renderGoals,
   open:   renderOpen
 };
 function refresh(...zones) {
   for (const n of (zones.length ? zones : Object.keys(RENDER))) RENDER[n]();
 }
 
+// ⚠️ ЄДИНА ТОЧКА МУТАЦІЇ. Будь-яка зміна даних проходить ТІЛЬКИ через неї.
+function commit() {
+  bumpStats();
+  refresh();
+  checkLevelUp();
+}
+
 function renderXp() {
-  const info = getLevelInfo(totalXp());
+  const info = S().level;
   const hex = $("xp-hex");
   hex.textContent = info.n;
   hex.style.setProperty("--lvl", info.league.color);
@@ -786,26 +1410,29 @@ function renderXp() {
 }
 
 function renderToday() {
-  // ⚠️ Збірка HTML — ТІЛЬКИ масивом і .join(""). Ланцюжок через '+' ламається
-  // від коментаря в кінці рядка: '+' з'їдається, і половина панелі тихо зникає.
+  const s = S();
+  // ⚠️ Збірка ТІЛЬКИ масивом і .join(""). Ланцюжок через '+' ламається від
+  // коментаря в кінці рядка: '+' з'їдається, і половина панелі тихо зникає.
   const h = [
-    '<span class="chip">Сьогодні: <b>0</b> задач</span>',
-    '<span class="chip"><b>0</b> XP</span>',
-    '<span class="chip">🔥 серія <b>0</b></span>'
+    '<span class="chip">Сьогодні: <b>', s.today.done, '</b> ',
+    plural(s.today.done, "задача", "задачі", "задач"), '</span>',
+    '<span class="chip"><b>', fmtXpNum(s.today.xp), '</b> XP</span>',
+    '<span class="chip">🔥 серія <b>', s.streak.current, '</b></span>'
   ];
   $("today-row").innerHTML = h.join("");
 }
 
 function renderDifRow() {
   const h = [];
-  for (const d of DEFAULT_DIFFICULTIES.filter(x => !x.archived).sort((a, b) => a.order - b.order)) {
+  for (const d of activeDifs()) {
     const st = [
       "--dif:", d.color, ";",
       "--dif-t:", hexToRgba(d.color, 0.13), ";",
       "--dif-b:", hexToRgba(d.color, 0.34), ";"
     ].join("");
     h.push(
-      '<button class="dif-btn" data-dif="', esc(d.id), '" style="', st, '">',
+      '<button class="dif-btn" data-dif="', escAttr(d.id), '" style="', st, '" title="',
+      escAttr(DIF_HINTS[d.id] || ""), '">',
       '<span>', esc(d.icon), '</span>',
       '<span class="n">', esc(d.name), '</span>',
       '<span class="xp">+', d.xp | 0, '</span>',
@@ -816,84 +1443,222 @@ function renderDifRow() {
 }
 
 function renderTotals() {
-  const rows = [
-    ["✅", "Задач виконано", "0"],
-    ["⚡", "Усього XP", "0"],
-    ["📆", "Днів активності", "0"],
-    ["🔥", "Поточна серія", "0"],
-    ["📊", "Сер. задач/день", "0"],
-    ["📊", "Сер. задач/місяць", "0"],
-    ["🗓", "Найкращий день тижня", "—"]
-  ];
+  const s = S();
+  const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
   const h = [];
-  for (const [ic, label, val] of rows) {
-    h.push('<div class="tot-r"><span>', ic, '</span><span class="l">', esc(label),
-           '</span><span class="v">', esc(val), '</span></div>');
+  const row = (ic, label, val, color) => h.push(
+    '<div class="tot-r"><span>', ic, '</span><span class="l"', (color ? ' style="color:' + color + '"' : ''),
+    '>', esc(label), '</span><span class="v">', esc(String(val)), '</span></div>'
+  );
+  row("✅", "Задач виконано", s.tasks.done);
+  for (const d of difs) {
+    const n = s.tasks.doneByDiff[d.id] || 0;
+    if (n) row(d.icon, d.name, n, d.color);
   }
+  if (s.goals.done) row("🎯", "Цілей досягнуто", s.goals.done);
+  row("⚡", "Усього XP", fmtXpNum(s.xp.total));
+  row("📆", "Днів активності", s.days.active);
+  row("🔥", "Поточна серія", s.streak.current);
+  row("🏅", "Найдовша серія", s.streak.best);
+  row("📊", "Сер. задач/день", s.avg.donePerCalendarDay.toFixed(1));
+  row("📊", "Сер. задач/місяць", s.avg.donePerMonth.toFixed(1));
+  row("🗓", "Найкращий день тижня", s.weekday.best.idx >= 0 ? s.weekday.best.name : "—");
   $("tot-list").innerHTML = h.join("");
 }
 
-function renderDays() { $("prog-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.days) + '</div>'; }
+// Один рядок агрегату — спільний для дня, тижня, місяця й року.
+function progRow(label, agg, isToday) {
+  const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
+  const h = ['<div class="prog-row', (isToday ? ' today' : ''), '">',
+             '<span class="prog-date">', esc(label), '</span><span class="prog-cells">'];
+  for (const d of difs) {
+    const n = agg.byDif[d.id] || 0;
+    if (!n) continue;
+    const st = ["--c:", d.color, ";--c-t:", hexToRgba(d.color, 0.14), ";--c-b:", hexToRgba(d.color, 0.38)].join("");
+    h.push('<span class="pgc" style="', st, '" title="', escAttr(d.name), '">', esc(d.icon), ' ', n, '</span>');
+  }
+  if (agg.goals) h.push('<span class="pgc" style="--c:#ffd166;--c-t:rgba(255,209,102,0.14);--c-b:rgba(255,209,102,0.38)">🎯 ', agg.goals, '</span>');
+  h.push('</span><span class="prog-xp">+', fmtXpNum(agg.xp), '</span></div>');
+  return h.join("");
+}
 
-// Права колонка — задачі, які ще в роботі. Заголовок несе лічильник, щоб
-// колонка не читалась як список боргів: число видно, докору немає.
+// Згортання: 7 днів → тижні поточного місяця → місяці → роки.
+function renderDays() {
+  const s = S();
+  const keys = s.dayKeys.slice().sort().reverse();
+  if (!keys.length) {
+    $("prog-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.days) + '</div>';
+    return;
+  }
+  const today = todayKey();
+  const tNum = dayNum(today);
+  const curMonth = monthKey(today);
+  const curYear = today.slice(0, 4);
+
+  const recent = [], inMonth = [], inYear = [], older = [];
+  for (const k of keys) {
+    if (tNum - dayNum(k) < 7) recent.push(k);
+    else if (monthKey(k) === curMonth) inMonth.push(k);
+    else if (k.slice(0, 4) === curYear) inYear.push(k);
+    else older.push(k);
+  }
+  const blank = () => ({ done: 0, xp: 0, goals: 0, byDif: {} });
+  const merge = (agg, r) => {
+    agg.done += r.done; agg.xp += r.xp; agg.goals += r.goals;
+    for (const id of Object.keys(r.byDif)) agg.byDif[id] = (agg.byDif[id] || 0) + r.byDif[id];
+    return agg;
+  };
+  const group = (list, keyOf) => {
+    const m = new Map();
+    for (const k of list) {
+      const g = keyOf(k);
+      if (!m.has(g)) m.set(g, blank());
+      merge(m.get(g), s.dayMap[k]);
+    }
+    return m;
+  };
+
+  const h = [];
+  for (const k of recent) h.push(progRow(fmtDay(k), s.dayMap[k], k === today));
+
+  if (inMonth.length) {
+    h.push('<div class="prog-sect">ТИЖНІ · ', esc(MONTH_NAMES[+curMonth.slice(5, 7) - 1].toUpperCase()), '</div>');
+    const g = group(inMonth, k => weekNum(k));
+    for (const [wn, agg] of [...g.entries()].sort((a, b) => b[0] - a[0]))
+      h.push(progRow(fmtRange(keyFromNum(wn), keyFromNum(wn + 6)), agg, false));
+  }
+  if (inYear.length) {
+    h.push('<div class="prog-sect">МІСЯЦІ · ', esc(curYear), '</div>');
+    const g = group(inYear, k => monthKey(k));
+    for (const [mk, agg] of [...g.entries()].sort().reverse())
+      h.push(progRow(MONTH_NAMES[+mk.slice(5, 7) - 1], agg, false));
+  }
+  if (older.length) {
+    h.push('<div class="prog-sect">РОКИ</div>');
+    const g = group(older, k => k.slice(0, 4));
+    for (const [y, agg] of [...g.entries()].sort().reverse()) h.push(progRow(y, agg, false));
+  }
+  $("prog-list").innerHTML = h.join("");
+}
+
+function renderGoals() {
+  const goals = loadGoals().slice().sort((a, b) => (gDone(a) ? 1 : 0) - (gDone(b) ? 1 : 0) || b.createdAt - a.createdAt);
+  if (!goals.length) {
+    $("goal-list").innerHTML = '<div class="empty">Цілей ще немає. Ціль — це щось довше за задачу: «знайти 10 товарів», «заробити 100$».</div>';
+    return;
+  }
+  const h = [];
+  for (const g of goals) {
+    const pct = Math.min(100, (g.current / g.target) * 100);
+    const dn = gDone(g);
+    h.push(
+      '<div class="goal', (dn ? ' done' : ''), '" data-goal="', escAttr(g.id), '">',
+      '<div class="goal-top"><span class="goal-t">', esc(g.title), '</span>',
+      '<span class="goal-xp">', (dn ? '✓ +' : '+'), (g.xp | 0), ' XP</span></div>',
+      '<div class="goal-bar"><div class="goal-fill" style="width:', pct.toFixed(1), '%"></div></div>',
+      '<div class="goal-ctl">',
+      '<button class="mini" data-gact="dec">−</button>',
+      '<input class="goal-num" type="number" data-gact="set" value="', g.current, '" min="0" max="', g.target, '">',
+      '<span>/ ', g.target, ' ', esc(g.unit), '</span>',
+      '<button class="mini" data-gact="inc">+</button>',
+      (dn ? '<button class="mini" data-gact="reopen">↩</button>' : ''),
+      '<button class="mini dz" data-gact="del">🗑</button>',
+      '</div></div>'
+    );
+  }
+  $("goal-list").innerHTML = h.join("");
+}
+
 function renderOpen() {
-  const open = loadTasks().filter(t => !(typeof t.doneAt === "number" && t.doneAt > 0));
-  $("open-h").textContent = "📋 Поточні задачі" + (open.length ? " · " + open.length : "");
-  $("open-list").innerHTML = open.length
-    ? ""
-    : '<div class="empty">' + esc(EMPTY_STATES.open) + '</div>';
+  const open = loadTasks().filter(t => !tDone(t)).sort((a, b) => b.createdAt - a.createdAt);
+  $("open-h").innerHTML = 'У РОБОТІ' + (open.length ? ' · ' + open.length : '') +
+    '<button class="add" id="task-add">+ задача</button>';
+  if (!open.length) { $("open-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.open) + '</div>'; return; }
+  const h = [];
+  for (const t of open) {
+    const d = getDif(t.difficultyId);
+    h.push(
+      '<div class="task" style="--c:', d.color, '" data-task="', escAttr(t.id), '">',
+      '<span class="task-t">', esc(t.title), '</span>',
+      '<span class="task-x">+', d.xp | 0, '</span>',
+      '<button class="mini" data-tact="done">✓</button>',
+      '<button class="mini" data-tact="del">🗑</button>',
+      '</div>'
+    );
+  }
+  $("open-list").innerHTML = h.join("");
 }
 
-/* ─── §11 · РОЗКЛАДКА ТА ІНІЦІАЛІЗАЦІЯ ───────────────────────────────────── */
-// Компенсація зсуву: коли обидві бічні панелі видимі, ліва (440) ширша за
-// праву (420), і центральна картка з'їжджала б на 10px вправо.
-function updateLayoutAlign() {
-  const layout = document.querySelector(".layout");
-  if (!layout) return;
-  const progHidden = $("progress-panel").classList.contains("hidden");
-  const rightVisible = !$("open-panel").classList.contains("hidden");
-  layout.classList.toggle("shift-right", rightVisible && progHidden);
-  layout.classList.toggle("balance-center", rightVisible && !progHidden);
-}
-addEventListener("resize", () => requestAnimationFrame(updateLayoutAlign));
+/* ─── §11 · НАЛАШТУВАННЯ ────────────────────────────────────────────────── */
+function renderSettings() {
+  const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
+  const plan = loadPlan();
+  const s = S();
+  const h = ['<div class="set-block">',
+    '<div class="set-sect">Складності</div>',
+    '<div class="set-note">⚠️ Зміна XP діє лише на МАЙБУТНІ виконання. Уже виконані задачі зберігають той XP, який отримали — інакше вся історія й рекорди попливли б.<br>Складність із виконаними задачами не видаляється, а архівується: історія має лишатись кольоровою.</div>'];
 
-/* ── Оверлей «Сходи рівнів» ──
-   Клік по XP-блоку відкриває всі 100 рівнів: згори максимум, знизу перший —
-   як на сходах. Рівні згруповані по лігах, колір ліги фарбує бейдж, межу
-   й сяйво рядка. Поточний рівень підсвічений і в нього скролиться список. */
+  const activeCount = difs.filter(d => !d.archived).length;
+  for (const d of difs) {
+    const used = (s.tasks.doneByDiff[d.id] || 0);
+    h.push(
+      '<div class="dif-edit', (d.archived ? ' arch' : ''), '" data-dif="', escAttr(d.id),
+      '" style="--c-b:', hexToRgba(d.color, 0.34), '">',
+      '<input class="fld f-ic" data-set="icon" value="', escAttr(d.icon), '" maxlength="4" title="Значок">',
+      '<input class="f-col" type="color" data-set="color" value="', escAttr(d.color), '" title="Колір">',
+      '<input class="fld f-nm" data-set="name" value="', escAttr(d.name), '" maxlength="40">',
+      '<input class="fld f-xp" data-set="xp" type="number" min="0" step="5" value="', d.xp | 0, '" title="XP за виконання">',
+      '<button class="mini" data-dact="up" title="Вище">↑</button>',
+      '<button class="mini" data-dact="down" title="Нижче">↓</button>',
+      (d.archived
+        ? '<button class="mini" data-dact="unarch" title="Повернути">↩</button>'
+        : '<button class="mini" data-dact="arch" title="' +
+          (used ? 'Архівувати (є ' + used + ' виконаних)' : 'Видалити') + '"' +
+          (activeCount <= 1 ? ' disabled' : '') + '>' + (used ? '📦' : '🗑') + '</button>'),
+      '</div>'
+    );
+  }
+  h.push('<button class="mini" id="dif-add">+ додати складність</button></div>');
+
+  h.push('<div class="set-block"><div class="set-sect">Плани</div>',
+    '<div class="row2"><span style="flex:0 0 150px">Задач на день</span>',
+    '<input class="fld" id="p-day" type="number" min="1" step="1" value="', plan.perDay | 0, '"></div>',
+    '<div class="row2"><span style="flex:0 0 150px">Задач на місяць</span>',
+    '<input class="fld" id="p-month" type="number" min="1" step="1" value="', plan.perMonth | 0, '"></div>',
+    '</div>');
+
+  h.push('<div class="set-block"><div class="set-sect">Дані</div>',
+    '<div class="set-note">Задач у журналі: ', s.tasks.total, ' · цілей: ', s.goals.total,
+    ' · днів активності: ', s.days.active, '</div></div>');
+
+  $("set-body").innerHTML = h.join("");
+}
+
+function openSettings() { renderSettings(); $("settings-overlay").classList.remove("hidden"); }
+function closeSettings() { $("settings-overlay").classList.add("hidden"); }
+
+/* ─── §12 · ОВЕРЛЕЇ ─────────────────────────────────────────────────────── */
 function openLevels() {
-  const info = getLevelInfo(totalXp());
-
+  const info = S().level;
   $("lvl-sub").textContent = LEVELS.length + " рівнів · " + LEAGUES.length + " ліг · зараз "
     + info.name + (info.isMax ? "" : " · до наступного " + fmtXpNum(info.xpToNext) + " XP");
 
-  // ⚠️ Збірка ТІЛЬКИ масивом і .join(""). Ланцюжок через '+' ламається від
-  // коментаря в кінці рядка: '+' з'їдається, і половина списку тихо зникає.
   const h = ['<div class="lvl-list">'];
-
   for (let li = LEAGUES.length - 1; li >= 0; li--) {
     const lg = LEAGUES[li];
     const from = li * PER_LEAGUE + 1;
     const to = Math.min(LEVELS.length, from + PER_LEAGUE - 1);
-
     h.push(
       '<div class="lg-head" style="--lg:', lg.color, ';--lg-b:', hexToRgba(lg.color, 0.35), '">',
       lg.icon, ' ', esc(lg.name),
       '<span class="lg-range">рівні ', from, '–', to, ' · від ', fmtXpNum(LEVELS[from - 1]), ' XP</span>',
       '</div>'
     );
-
     for (let n = to; n >= from; n--) {
       const cls = 'lvl-row' + (n === info.n ? ' cur' : (n > info.n ? ' future' : ''));
-      const st = [
-        '--lg:', lg.color,
-        ';--lg2:', lg.color2,
-        ';--lg-t:', hexToRgba(lg.color, 0.10),
-        ';--lg-s:', hexToRgba(lg.color, 0.26),
-        ';--lg-b:', hexToRgba(lg.color, 0.42),
-        ';--lg-g:', hexToRgba(lg.color, 0.38)
-      ].join('');
+      const st = ['--lg:', lg.color, ';--lg2:', lg.color2,
+        ';--lg-t:', hexToRgba(lg.color, 0.10), ';--lg-s:', hexToRgba(lg.color, 0.26),
+        ';--lg-b:', hexToRgba(lg.color, 0.42), ';--lg-g:', hexToRgba(lg.color, 0.38)].join('');
       h.push(
         '<div class="', cls, '" style="', st, '">',
         '<span class="lvl-num">', n, '</span>',
@@ -907,40 +1672,213 @@ function openLevels() {
     }
   }
   h.push('</div>');
-
   $("lvl-body").innerHTML = h.join("");
   $("levels-overlay").classList.remove("hidden");
-
   const cur = $("lvl-body").querySelector(".lvl-row.cur");
   if (cur) cur.scrollIntoView({ block: "center" });
 }
 function closeLevels() { $("levels-overlay").classList.add("hidden"); }
 
-$("xp-section").addEventListener("click", openLevels);
-$("levels-overlay").addEventListener("click", e => {
-  // Закриття по кліку на затемнення або на ✕ — без окремих обробників на кожен.
-  if (e.target === $("levels-overlay") || e.target.closest('[data-act="close"]')) closeLevels();
-});
-addEventListener("keydown", e => { if (e.key === "Escape") { closeLevels(); closeRecords(); } });
-
-/* ── Оверлей «Рекорди» ──
-   Рішення сесії 1: рекорди живуть окремим оверлеєм, а права колонка віддана
-   поточним задачам. Чипси періодів працюють уже зараз (обраний період
-   зберігається); самі рекорди наповняться, коли з'явиться S() і історія. */
 function renderRecChips() {
+  const s = S();
   const cur = lsGet(K.recPeriod, DEFAULT_PERIOD);
   const h = [];
   for (const p of PERIODS) {
-    h.push('<button class="chip-btn', (p.id === cur ? ' on' : ''), '" data-period="', esc(p.id), '">',
+    h.push('<button class="chip-btn', (p.id === cur ? ' on' : ''), '" data-period="', escAttr(p.id), '">',
            esc(p.label), '</button>');
   }
   $("rec-chips").innerHTML = h.join("");
-  $("rec-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.records) + '</div>';
+
+  if (!s.dayKeys.length) { $("rec-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.records) + '</div>'; return; }
+
+  const period = PERIODS.find(p => p.id === cur) || PERIODS[0];
+  const today = todayKey();
+  const keys = s.dayKeys.filter(k => period.month
+    ? monthKey(k) === monthKey(today)
+    : dayNum(today) - dayNum(k) < period.days);
+  let pDone = 0, pXp = 0, pBest = 0, pBestAt = null;
+  for (const k of keys) {
+    const r = s.dayMap[k];
+    pDone += r.done; pXp += r.xp;
+    if (r.done > pBest) { pBest = r.done; pBestAt = k; }
+  }
+  const rows = [
+    ["🏅", "Задач за день", s.best.dayDone, s.best.dayDoneAt],
+    ["⚡", "XP за день", fmtXpNum(s.best.dayXp), s.best.dayXpAt],
+    ["🎖", "XP за день · без епіків", fmtXpNum(s.best.dayXpFair), s.best.dayXpFairAt],
+    ["📅", "Задач за тиждень", s.best.weekDone, null],
+    ["🗓", "Задач за місяць", s.best.monthDone, null],
+    ["🗓", "XP за місяць", fmtXpNum(s.best.monthXp), null],
+    ["🔥", "Найдовша серія", s.streak.best + " " + plural(s.streak.best, "день", "дні", "днів"), s.streak.bestEnd],
+    ["💎", "Найдорожча задача", fmtXpNum(s.best.taskXp) + " XP", null]
+  ];
+  const h2 = ['<div class="set-note">За період: <b>', pDone, '</b> ',
+    plural(pDone, "задача", "задачі", "задач"), ' · <b>', fmtXpNum(pXp), '</b> XP · найкращий день ',
+    (pBestAt ? '<b>' + pBest + '</b> (' + esc(fmtDay(pBestAt)) + ')' : '—'), '</div>'];
+  for (const [ic, label, val, at] of rows) {
+    h2.push('<div class="tot-r"><span>', ic, '</span><span class="l">', esc(label), '</span>',
+            '<span class="v">', esc(String(val)), (at ? ' <span style="color:var(--tx-5);font-weight:400">· ' + esc(fmtDay(at)) + '</span>' : ''),
+            '</span></div>');
+  }
+  $("rec-list").innerHTML = h2.join("");
 }
 function openRecords() { renderRecChips(); $("records-overlay").classList.remove("hidden"); }
 function closeRecords() { $("records-overlay").classList.add("hidden"); }
 
+function openGoalModal() { $("goal-modal").classList.remove("hidden"); $("g-title").focus(); }
+function closeGoalModal() { $("goal-modal").classList.add("hidden"); }
+
+/* ─── §13 · ОБРОБНИКИ ────────────────────────────────────────────────────── */
+// Делеговані обробники: нові рядки не потребують нових слухачів.
+
+$("dif-row").addEventListener("click", e => {
+  const b = e.target.closest("[data-dif]");
+  if (!b) return;
+  const input = $("task-input");
+  if (!input.value.trim()) { input.focus(); return; }
+  addDone(input.value, b.dataset.dif);
+  input.value = "";
+  input.focus();
+});
+
+$("task-input").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  // Enter повторює останню обрану складність — щоб серію дрібних задач
+  // можна було записати не відриваючи рук від клавіатури.
+  const last = lsGet(K.lastDif, "") || (activeDifs()[0] || {}).id;
+  if (!last) return;
+  if (addDone(e.target.value, last)) { e.target.value = ""; }
+});
+
+$("goal-list").addEventListener("click", e => {
+  const box = e.target.closest("[data-goal]");
+  const btn = e.target.closest("[data-gact]");
+  if (!box || !btn) return;
+  const id = box.dataset.goal;
+  const g = loadGoals().find(x => x.id === id);
+  if (!g) return;
+  const act = btn.dataset.gact;
+  if (act === "inc") setGoalProgress(id, g.current + 1);
+  else if (act === "dec") setGoalProgress(id, g.current - 1);
+  else if (act === "reopen") reopenGoal(id);
+  else if (act === "del") deleteGoal(id);
+});
+// ⚠️ change, не input: input перемальовував би список на кожній цифрі
+// й забирав фокус із поля, яке саме редагують.
+$("goal-list").addEventListener("change", e => {
+  const box = e.target.closest("[data-goal]");
+  if (!box || e.target.dataset.gact !== "set") return;
+  setGoalProgress(box.dataset.goal, +e.target.value);
+});
+
+$("open-list").addEventListener("click", e => {
+  const box = e.target.closest("[data-task]");
+  const btn = e.target.closest("[data-tact]");
+  if (!box || !btn) return;
+  if (btn.dataset.tact === "done") completeTask(box.dataset.task);
+  else if (btn.dataset.tact === "del") deleteTask(box.dataset.task);
+});
+
+$("open-panel").addEventListener("click", e => {
+  if (e.target.id === "goal-add") openGoalModal();
+  if (e.target.id === "task-add") {
+    const title = prompt("Назва задачі, яку тільки плануєш:");
+    if (!title) return;
+    const d = activeDifs()[0];
+    if (d) addOpen(title, lsGet(K.lastDif, "") || d.id);
+  }
+});
+
+$("g-save").addEventListener("click", () => {
+  const ok = addGoal($("g-title").value, +$("g-target").value, $("g-unit").value, +$("g-xp").value, +$("g-current").value);
+  if (!ok) { $("g-title").focus(); return; }
+  $("g-title").value = "";
+  closeGoalModal();
+});
+
+// Налаштування: правки складностей.
+$("set-body").addEventListener("change", e => {
+  const box = e.target.closest("[data-dif]");
+  const field = e.target.dataset.set;
+  if (box && field) {
+    const difs = loadDifs();
+    const d = difs.find(x => x.id === box.dataset.dif);
+    if (!d) return;
+    if (field === "xp") d.xp = Math.max(0, +e.target.value | 0);
+    else if (field === "name") d.name = String(e.target.value).trim().slice(0, 40) || d.name;
+    else if (field === "icon") d.icon = String(e.target.value).trim().slice(0, 4) || d.icon;
+    else if (field === "color") d.color = e.target.value;
+    saveDifs(difs);
+    commit();
+    renderSettings();
+    return;
+  }
+  if (e.target.id === "p-day" || e.target.id === "p-month") {
+    const plan = loadPlan();
+    plan.perDay = Math.max(1, +$("p-day").value | 0);
+    plan.perMonth = Math.max(1, +$("p-month").value | 0);
+    savePlan(plan);
+    commit();
+  }
+});
+
+$("set-body").addEventListener("click", e => {
+  if (e.target.id === "dif-add") {
+    const difs = loadDifs();
+    const used = difs.map(d => d.color);
+    const color = DIF_PALETTE.find(c => !used.includes(c)) || DIF_PALETTE[0];
+    difs.push({
+      id: rid("d_"), name: "Нова", icon: "⬜", color,
+      xp: 25, order: difs.length + 1, archived: false
+    });
+    saveDifs(difs);
+    commit();
+    renderSettings();
+    return;
+  }
+  const box = e.target.closest("[data-dif]");
+  const btn = e.target.closest("[data-dact]");
+  if (!box || !btn) return;
+  const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
+  const i = difs.findIndex(x => x.id === box.dataset.dif);
+  if (i < 0) return;
+  const act = btn.dataset.dact;
+
+  if (act === "up" && i > 0) { const t = difs[i]; difs[i] = difs[i - 1]; difs[i - 1] = t; }
+  else if (act === "down" && i < difs.length - 1) { const t = difs[i]; difs[i] = difs[i + 1]; difs[i + 1] = t; }
+  else if (act === "unarch") difs[i].archived = false;
+  else if (act === "arch") {
+    const used = (S().tasks.doneByDiff[difs[i].id] || 0);
+    const openN = loadTasks().filter(t => !tDone(t) && t.difficultyId === difs[i].id).length;
+    if (used) {
+      // ⚠️ Складність із історією НЕ видаляється, а архівується: інакше рядки
+      // «Прогресу по днях» посіріли б заднім числом і здобуті ліги обнулились.
+      if (!confirm('По складності «' + difs[i].name + '» є ' + used + ' виконаних задач.\nВона піде в архів: зникне з кнопок, але історія лишиться кольоровою.')) return;
+      difs[i].archived = true;
+    } else {
+      if (openN && !confirm('У складності «' + difs[i].name + '» є ' + openN + ' відкритих задач. Видалити складність?')) return;
+      if (!used && !openN && !confirm('Видалити складність «' + difs[i].name + '»?')) return;
+      difs.splice(i, 1);
+    }
+  }
+  difs.forEach((d, n) => { d.order = n + 1; });
+  saveDifs(difs);
+  commit();
+  renderSettings();
+});
+
+// Оверлеї: закриття по ✕, кліку на затемнення і Esc — в одному місці.
+function wireOverlay(id, close) {
+  $(id).addEventListener("click", e => {
+    if (e.target === $(id) || e.target.closest('[data-act="close"]')) close();
+  });
+}
+$("xp-section").addEventListener("click", openLevels);
 $("records-btn").addEventListener("click", openRecords);
+$("settings-btn").addEventListener("click", openSettings);
+wireOverlay("levels-overlay", closeLevels);
+wireOverlay("settings-overlay", closeSettings);
+wireOverlay("goal-modal", closeGoalModal);
 $("records-overlay").addEventListener("click", e => {
   if (e.target === $("records-overlay") || e.target.closest('[data-act="close"]')) { closeRecords(); return; }
   const chip = e.target.closest("[data-period]");
@@ -948,17 +1886,62 @@ $("records-overlay").addEventListener("click", e => {
   lsSet(K.recPeriod, chip.dataset.period);
   renderRecChips();
 });
+addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  closeLevels(); closeRecords(); closeSettings(); closeGoalModal();
+});
+
+$("prog-btn").addEventListener("click", () => {
+  const p = $("progress-panel");
+  p.classList.toggle("hidden");
+  lsSet(K.progOpen, p.classList.contains("hidden") ? "0" : "1");
+  updateLayoutAlign();
+});
+
+/* ─── §14 · РОЗКЛАДКА ТА ІНІЦІАЛІЗАЦІЯ ───────────────────────────────────── */
+// Компенсація зсуву: коли обидві бічні панелі видимі, ліва (440) ширша за
+// праву (420), і центральна картка з'їжджала б на 10px вправо.
+function updateLayoutAlign() {
+  const layout = document.querySelector(".layout");
+  if (!layout) return;
+  const progHidden = $("progress-panel").classList.contains("hidden");
+  const rightVisible = !$("open-panel").classList.contains("hidden");
+  layout.classList.toggle("shift-right", rightVisible && progHidden);
+  layout.classList.toggle("balance-center", rightVisible && !progHidden);
+}
+addEventListener("resize", () => requestAnimationFrame(updateLayoutAlign));
+
+// ⚠️ Сторож доби: вкладка, залишена з вечора, о 00:30 показувала б учорашні
+// цифри як сьогоднішні й рахувала б серію від учора.
+let _dayGuard = todayKey();
+setInterval(() => {
+  const t = todayKey();
+  if (t !== _dayGuard) { _dayGuard = t; bumpStats(); refresh(); }
+}, 60000);
+
+// ⚠️ Дві вкладки на одному origin ділять localStorage: збереження з іншої
+// вкладки нашою застарілою копією масиву затиралось би тихо, без помилки.
+addEventListener("storage", e => {
+  if (!e.key || !BACKUP_KEYS.includes(e.key)) return;
+  bumpStats();
+  refresh();
+});
 
 function init() {
   $("app-title").textContent = WQ_TEXT.appTitle;
   $("app-sub").textContent   = WQ_TEXT.appSub;
   $("ask-label").textContent = WQ_TEXT.askDone.toUpperCase();
   $("add-hint").textContent  = WQ_TEXT.addHint;
-  $("th-goal").textContent   = DEFAULT_PLAN.perDay + " з.";
+  $("th-goal").textContent   = loadPlan().perDay + " з.";
 
   if (!LS_OK) console.warn(WQ_TEXT.errPrivate);
 
+  sanitizeData();
+  if (lsGet(K.progOpen, "1") === "0") $("progress-panel").classList.add("hidden");
+
+  bumpStats();
   refresh();
+  checkLevelUp();          // перший виклик лише запам'ятовує рівень, не святкує
 
   requestAnimationFrame(() => {
     updateLayoutAlign();
