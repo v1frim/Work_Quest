@@ -3,16 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0c0d10">
+<meta name="theme-color" content="#0a0e20">
 <title>Work Quest — трекер робочих задач</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- ⚠️ media="print"+onload = НЕблокуюче завантаження: звичайний stylesheet-лінк
-     у <head> зупиняє виконання скриптів, доки не відповість CDN, — офлайн або
-     без мережі (file://, тести) сторінка висіла б. Так вона стартує одразу
-     на системному шрифті, а Inter підміняється, щойно доїде. -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
    A. ТОКЕНИ
@@ -21,62 +13,62 @@
    оверлей святкування розійшлись у відтінках срібла й золота.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* — ОДИН акцент (бурштин XP). Де йому можна з'являтись — DESIGN.md §1.1.
-       Родина відтінків лишається як API для старого коду, але всі вони —
-       тони того самого бурштину, не окремі кольори. — */
-  --gold:        #e3aa4e;
-  --gold-hi:     #edbd6d;
-  --gold-lo:     #d29a3f;
-  --gold-pale:   #f3d49a;
-  --gold-deep:   #b07f2e;
-  --on-gold:     #201503;
-  --grad-gold:   linear-gradient(180deg, #e9b45c, #dda344); /* майже плоский */
-  --grad-title:  none; /* історичний: градієнтного тексту більше немає */
+  /* — акцент (золото) — */
+  --gold:        #ffd166;
+  --gold-hi:     #ffe08a;
+  --gold-lo:     #ffc94d;
+  --gold-pale:   #ffe9a8;
+  --gold-deep:   #d99b2b;
+  --on-gold:     #1a1206;
+  --grad-gold:   linear-gradient(180deg, #ffe08a, #ffc94d);
+  --grad-title:  linear-gradient(180deg, #ffe9a8, #ffd166 55%, #d99b2b);
 
-  /* — статуси: тільки за прямим значенням (DESIGN.md §1.4) — */
-  --st-done:     #57c97a;
-  --st-active:   #7ea8f0;
-  --st-new:      #e0973f;
-  --st-fail:     #e56a6a;
-  --st-gain:     #3ecf9a;
-  --st-gain-bg:  rgba(62,207,154,0.14);
+  /* — статуси — */
+  --st-done:     #7be07b;
+  --st-active:   #87b4ff;
+  --st-new:      #ffa94d;
+  --st-fail:     #ff6b6b;
+  --st-gain:     #06d6a0;
+  --st-gain-bg:  rgba(6,214,160,0.16);
 
-  /* — полотно і поверхні: нейтральні СОЛІДИ, без градієнтів і «скла» — */
-  --bg:            #0c0d10;
-  --surface-card:  #15171c;
-  --surface-fixed: #15171c;
-  --surface-sheet: #17191f;
-  --solid-btn:     #1d2026;
-  --solid-btn-hov: #262a32;
-  --scrim:         rgba(6,7,10,0.72);
+  /* — поверхні — */
+  --surface-card:  linear-gradient(165deg, rgba(16,20,42,0.92), rgba(9,12,26,0.90));
+  --surface-fixed: linear-gradient(165deg, rgba(14,18,38,0.90), rgba(8,11,24,0.88));
+  --surface-sheet: linear-gradient(165deg, rgba(15,19,40,0.985), rgba(9,12,26,0.985));
+  /* ⚠️ СОЛІД, не скло: на світлих фазах доби напівпрозорі кнопки вимиваються
+     у невидимість. Кольорові кнопки = тінт ПОВЕРХ цієї підкладки. */
+  --solid-btn:     rgba(10,14,30,0.92);
+  --solid-btn-hov: rgba(42,38,20,0.95);
+  --scrim:         rgba(4,6,14,0.78);
 
-  /* — межі: нейтральні, два ступені (картка / інтерактив) — */
-  --bd-card:   1px solid rgba(255,255,255,0.07);
-  --bd-fixed:  1px solid rgba(255,255,255,0.07);
-  --bd-accent: 1px solid rgba(255,255,255,0.12);
-  --bd-row:    1px solid rgba(255,255,255,0.06);
-  --bd-cell:   1px solid rgba(255,255,255,0.12);
-  --bd-chip:   1px solid rgba(255,255,255,0.12);
-  --bd-ghost:  1px solid rgba(255,255,255,0.09);
+  /* — межі — */
+  --bd-card:   1px solid rgba(255,209,102,0.30);
+  --bd-fixed:  1px solid rgba(255,209,102,0.28);
+  --bd-accent: 1px solid rgba(255,209,102,0.28);
+  --bd-row:    1px solid rgba(255,255,255,0.08);
+  --bd-cell:   1px solid rgba(255,255,255,0.14);
+  --bd-chip:   1px solid rgba(255,255,255,0.18);
+  --bd-ghost:  1px solid rgba(255,255,255,0.11);
 
   /* — текст: шкала прозорості дає ієрархію без нових кольорів — */
   --tx:   #fff;
-  --tx-1: rgba(255,255,255,0.92);
+  --tx-1: rgba(255,255,255,0.90);
   --tx-2: rgba(255,255,255,0.72);
   --tx-3: rgba(255,255,255,0.62);
   --tx-4: rgba(255,255,255,0.50);
   --tx-5: rgba(255,255,255,0.42);
   --tx-6: rgba(255,255,255,0.35);
 
-  /* — тіні: одна м'яка на плаваючу поверхню. Сяйв немає:
-       --sh-glow переозначено як фокус-кільце (:focus і стани .on) — */
-  --sh-card:  0 12px 32px rgba(0,0,0,0.35);
-  --sh-fixed: 0 8px 24px rgba(0,0,0,0.30);
-  --sh-cta:   0 4px 14px rgba(0,0,0,0.30);
-  --sh-glow:  0 0 0 3px rgba(227,170,78,0.18);
+  /* — тіні — */
+  --sh-card:  0 24px 60px rgba(0,0,0,0.65),
+              inset 0 1px 0 rgba(255,209,102,0.14),
+              inset 0 0 60px rgba(255,209,102,0.03);
+  --sh-fixed: 0 12px 34px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,209,102,0.12);
+  --sh-cta:   0 6px 22px rgba(255,201,77,0.35);
+  --sh-glow:  0 0 16px rgba(255,209,102,0.35);
 
   /* — радіуси — */
-  --r-card: 16px; --r-box: 12px; --r-btn: 10px; --r-sm: 7px; --r-pill: 999px;
+  --r-card: 20px; --r-box: 14px; --r-btn: 12px; --r-sm: 8px; --r-pill: 999px;
 
   /* — геометрія. ⚠️ Міняєш --w-left → перерахуй --balance (= --w-left − --w-right),
        інакше центральна картка з'їде вбік. — */
@@ -112,24 +104,58 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-variant-numeric: tabular-nums; /* цифри в колонках не «танцюють» */
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   color: var(--tx);
-  background: var(--bg);
+  background:
+    /* зорі */
+    radial-gradient(1.6px 1.6px at 12% 22%, rgba(255,255,255,0.9), transparent 60%),
+    radial-gradient(1.2px 1.2px at 28% 64%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(2px   2px   at 43% 12%, rgba(255,255,255,0.85), transparent 60%),
+    radial-gradient(1.3px 1.3px at 58% 46%, rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(1.7px 1.7px at 71% 80%, rgba(255,255,255,0.75), transparent 60%),
+    radial-gradient(1.2px 1.2px at 84% 28%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(2px   2px   at 92% 62%, rgba(255,255,255,0.8), transparent 60%),
+    radial-gradient(1.3px 1.3px at 6%  84%, rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 36% 90%, rgba(255,255,255,0.65), transparent 60%),
+    radial-gradient(1.2px 1.2px at 64% 6%,  rgba(255,255,255,0.6), transparent 60%),
+    /* туманності */
+    radial-gradient(ellipse 55% 38% at 75% 15%, rgba(124,58,237,0.16), transparent 70%),
+    radial-gradient(ellipse 45% 30% at 15% 70%, rgba(255,209,102,0.08), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 45% 105%, rgba(45,120,220,0.14), transparent 70%),
+    /* глибокий космос */
+    linear-gradient(180deg, #05070f 0%, #0a0e20 40%, #101731 75%, #131b38 100%);
+  background-attachment: fixed;
 }
 
-/* ── Фон за порою дня (DESIGN.md §2). Механіка data-tod лишається, але фаза —
-   це лише ЛЕДЬ ПОМІТНИЙ тінт угорі нейтрального полотна, не пейзаж: картки
-   завжди стоять на тому самому спокійному майже-чорному фоні. Ніч і невідоме
-   значення = чистий --bg. Сезонні межі — у todFor() нижче. ── */
+/* ── Фон за порою дня. Атрибут data-tod ставить РАННІЙ скрипт до першого кадру,
+   інакше вранці блимає ніч. Фази "night" тут немає свідомо: базовий body вже
+   нічний, тож ніч і будь-яке невідоме значення дають космос вище.
+   Сезонні межі — у todFor() нижче. Картки лишаються темними в усіх фазах. ── */
 html[data-tod="morning"] body {
-  background: radial-gradient(1100px 480px at 80% -10%, rgba(240,176,120,0.055), transparent 70%), var(--bg);
+  background:
+    radial-gradient(ellipse 60% 40% at 78% 12%, rgba(255,225,180,0.55), transparent 70%),
+    radial-gradient(ellipse 50% 30% at 20% 8%, rgba(255,200,220,0.40), transparent 70%),
+    linear-gradient(180deg, #ffd9a8 0%, #ffc2ac 16%, #eeb0c4 34%, #c3b6dd 54%, #a9c6e8 76%, #cfe6f5 100%);
+  background-attachment: fixed;
 }
 html[data-tod="day"] body {
-  background: radial-gradient(1100px 480px at 50% -12%, rgba(140,178,235,0.055), transparent 70%), var(--bg);
+  background:
+    radial-gradient(ellipse 520px 180px at 8% 16%, rgba(255,255,255,0.85), transparent 100%),
+    radial-gradient(ellipse 300px 120px at 20% 11%, rgba(255,255,255,0.7), transparent 100%),
+    radial-gradient(ellipse 460px 160px at 76% 10%, rgba(255,255,255,0.8), transparent 100%),
+    radial-gradient(ellipse 280px 110px at 88% 6%, rgba(255,255,255,0.6), transparent 100%),
+    radial-gradient(ellipse 360px 130px at 95% 42%, rgba(255,255,255,0.5), transparent 100%),
+    linear-gradient(180deg, #6fb2e0 0%, #92c4e6 24%, #b2d6ef 48%, #cde6f6 70%, #e2f0fb 88%, #eef6fd 100%);
+  background-attachment: fixed;
 }
 html[data-tod="evening"] body {
-  background: radial-gradient(1100px 480px at 22% -10%, rgba(196,140,235,0.05), transparent 70%), var(--bg);
+  background:
+    radial-gradient(1.4px 1.4px at 22% 10%, rgba(255,255,255,0.7), transparent 60%),
+    radial-gradient(1.2px 1.2px at 64% 6%,  rgba(255,255,255,0.6), transparent 60%),
+    radial-gradient(1.3px 1.3px at 84% 14%, rgba(255,255,255,0.55), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 118%, rgba(255,170,90,0.55), transparent 70%),
+    linear-gradient(180deg, #1e1440 0%, #46285f 22%, #7b3a63 44%, #b85560 64%, #e0895a 84%, #f4b26e 100%);
+  background-attachment: fixed;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -178,7 +204,7 @@ html[data-tod="evening"] body {
   max-height: calc(100vh - 2 * var(--pad-page));
 }
 
-.panel-h  { font-size: 15px; font-weight: 700; color: var(--tx-1); margin: 0 0 2px; letter-spacing: 0.2px; }
+.panel-h  { font-size: 17px; font-weight: 700; color: var(--gold); margin: 0 0 2px; }
 .panel-sub{ font-size: 12px; color: var(--tx-4); margin: 0 0 14px; }
 
 /* Скрол усередині панелі — тонкий, це помітна частина «продуктовості» */
@@ -200,12 +226,12 @@ html[data-tod="evening"] body {
 /* ═══════════════════════════════════════════════════════════════════════════
    D. ЦЕНТРАЛЬНА КАРТКА
    ═══════════════════════════════════════════════════════════════════════════ */
-/* Стриманий ворднарк (DESIGN.md §4): без градієнтного тексту й золота на пів
-   екрана — головний герой картки не назва, а XP і поле вводу. */
 h1 {
   margin: 0 0 4px;
-  font-size: 19px; font-weight: 800; letter-spacing: 7px; text-align: center;
-  color: var(--tx-1); text-transform: uppercase;
+  font-size: 34px; font-weight: 800; letter-spacing: 1.5px; text-align: center;
+  background: var(--grad-title);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: var(--gold);
 }
 /* ⚠️ НЕ називати класи загальними словами (.sub, .row, .box): підкроки цілі
    мали клас "step sub" і мовчки успадкували звідси text-align:center й
@@ -222,20 +248,17 @@ h1 {
   padding: 6px 13px; font-size: 13px; color: var(--tx-1);
 }
 .chip b { color: var(--gold); font-weight: 700; }
-.chip.gold { color: var(--gold); border-color: rgba(227,170,78,0.45); }
+.chip.gold { color: var(--gold); border-color: rgba(255,209,102,0.5); box-shadow: var(--sh-glow); }
 
 /* — XP-блок — */
 .xp-wrap { margin-bottom: 20px; }
 .xp-row  { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-/* Бейдж рівня: колір ліги — це дані, тож малою дозою (DESIGN.md §1.3):
-   цифра і тонка межа, а не заливка квадрата на пів картки. */
 .xp-hex {
-  width: 44px; height: 44px; flex: none;
+  width: 46px; height: 46px; flex: none;
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; font-weight: 800; color: var(--lvl, var(--tx-1));
-  background: var(--solid-btn);
-  border: 1px solid var(--lvl-b, rgba(255,255,255,0.14)); /* тінт ліги рахує hexToRgba() у renderXp() */
-  border-radius: var(--r-box);
+  font-size: 18px; font-weight: 800; color: var(--on-gold);
+  background: linear-gradient(180deg, var(--lvl2, #e8eef7), var(--lvl, #9aa3b2));
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
 }
 .xp-meta { flex: 1 1 auto; min-width: 0; }
 .xp-name { font-size: 14px; font-weight: 700; color: var(--tx-1); letter-spacing: 0.4px; }
@@ -246,7 +269,7 @@ h1 {
 }
 .xp-fill {
   height: 100%; border-radius: var(--r-pill);
-  background: var(--gold);
+  background: var(--grad-gold); box-shadow: var(--sh-glow);
   transition: width var(--t-data) ease;
 }
 .xp-league { text-align: right; font-size: 11px; color: var(--tx-5); letter-spacing: 1px; margin-top: 5px; }
@@ -263,27 +286,26 @@ h1 {
 /* Спалах поля — коли фокус приходить не від кліку користувача по самому полю
    (кнопка «+ задача»), і треба показати, КУДИ саме тепер писати. */
 @keyframes fieldFlash {
-  0%   { box-shadow: 0 0 0 0 rgba(227,170,78,0.45); border-color: var(--gold); }
-  70%  { box-shadow: 0 0 0 11px rgba(227,170,78,0); border-color: var(--gold); }
-  100% { box-shadow: 0 0 0 0 rgba(227,170,78,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(255,209,102,0.55); border-color: var(--gold); }
+  70%  { box-shadow: 0 0 0 11px rgba(255,209,102,0); border-color: var(--gold); }
+  100% { box-shadow: 0 0 0 0 rgba(255,209,102,0); }
 }
 .field.flash { animation: fieldFlash 0.85s ease 2; }
 .field:focus { border-color: var(--gold); box-shadow: var(--sh-glow); }
 
 .dif-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
-/* Кнопка складності нейтральна; колір складності — лише крапка 8px і значення
-   XP (DESIGN.md §1.3). Повна кольорова заливка десяти кнопок = веселка. */
+/* ⚠️ Тінт ПОВЕРХ солідної підкладки, не прозорість: інакше на світлих фазах
+   доби кнопка вимивається. Тінт і бордер рахує hexToRgba() з кольору складності. */
 .dif-btn {
-  display: flex; align-items: center; gap: 9px;
-  padding: 10px 12px; font-size: 13px; font-weight: 500; font-family: inherit; text-align: left;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; font-size: 14px; font-family: inherit; text-align: left;
   color: var(--tx-1); cursor: pointer;
-  background: var(--solid-btn);
-  border: var(--bd-chip); border-radius: var(--r-btn);
-  transition: transform var(--t-press) ease, background-color var(--t-fast) ease, border-color var(--t-fast) ease;
+  background: linear-gradient(0deg, var(--dif-t), var(--dif-t)), var(--solid-btn);
+  border: 1px solid var(--dif-b); border-radius: var(--r-btn);
+  transition: transform var(--t-press) ease, box-shadow var(--t-fast) ease;
 }
-.dif-btn:hover  { background: var(--solid-btn-hov); border-color: var(--dif-b); }
+.dif-btn:hover  { box-shadow: 0 0 14px var(--dif-t); }
 .dif-btn:active { transform: translateY(1px); }
-.dif-btn .dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--dif); }
 .dif-btn .n   { flex: 1 1 auto; min-width: 0; }
 .dif-btn .xp  { font-size: 12px; font-weight: 700; color: var(--dif); }
 
@@ -299,9 +321,8 @@ h1 {
   background: var(--surface-fixed); border: var(--bd-fixed);
   border-radius: var(--r-box); box-shadow: var(--sh-fixed);
 }
-.tot-h { font-size: 10px; letter-spacing: 1.6px; color: var(--tx-5); text-align: center; margin-bottom: 8px; }
+.tot-h { font-size: 10px; letter-spacing: 1.5px; color: var(--gold); text-align: center; margin-bottom: 8px; }
 .tot-r { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; }
-.tot-r .dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
 .tot-r + .tot-r { border-top: var(--bd-row); }
 .tot-r .l { flex: 1 1 auto; min-width: 0; color: var(--tx-3); }
 .tot-r .v { font-weight: 700; color: var(--tx-1); }
@@ -315,7 +336,7 @@ h1 {
   background: var(--surface-fixed); border: var(--bd-fixed);
   border-radius: var(--r-box); box-shadow: var(--sh-fixed);
 }
-.th-cap  { font-size: 9px; letter-spacing: 1.4px; color: var(--tx-5); }
+.th-cap  { font-size: 9px; letter-spacing: 1.4px; color: var(--st-new); }
 .th-plan { font-size: 11px; color: var(--tx-3); }
 .th-tube {
   position: relative; width: 12px; height: 260px; border-radius: var(--r-pill);
@@ -324,12 +345,13 @@ h1 {
 .th-fill {
   position: absolute; left: 0; right: 0; bottom: 0; height: 0;
   border-radius: var(--r-pill);
-  background: var(--gold);
+  background: linear-gradient(180deg, var(--gold-hi), var(--st-new));
   transition: height var(--t-data) cubic-bezier(.34,1.2,.64,1);
 }
 .th-bulb {
-  width: 20px; height: 20px; border-radius: 50%;
-  background: var(--gold);
+  width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(180deg, var(--gold-hi), var(--st-new));
+  box-shadow: var(--sh-glow);
 }
 
 #bottom-left-btns {
@@ -345,7 +367,7 @@ h1 {
   background: var(--solid-btn); border: var(--bd-accent); border-radius: var(--r-btn);
   transition: color var(--t-fast) ease, background-color var(--t-fast) ease;
 }
-.act:hover { background: var(--solid-btn-hov); color: var(--tx); }
+.act:hover { background: var(--solid-btn-hov); color: var(--gold); }
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -360,7 +382,7 @@ h1 {
   padding: 6px 8px; margin: -6px -8px 14px;
   transition: background-color var(--t-fast) ease;
 }
-#xp-section:hover { background: rgba(255,255,255,0.04); }
+#xp-section:hover { background: rgba(255,209,102,0.07); }
 
 #levels-overlay, #records-overlay, #settings-overlay, #goal-modal, #day-modal {
   position: fixed; inset: 0; z-index: 300;
@@ -372,15 +394,15 @@ h1 {
   width: 640px; max-width: 96vw; height: 86vh;
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface-sheet);
-  border: var(--bd-card);
+  border: 1px solid rgba(255,209,102,0.32);
   border-radius: var(--r-card);
-  box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,209,102,0.14);
 }
 .sheet-head {
   display: flex; align-items: center; gap: 12px; flex-shrink: 0;
   padding: 16px 22px; border-bottom: 1px solid rgba(255,255,255,0.12);
 }
-.sheet-head h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--tx-1); }
+.sheet-head h2 { margin: 0; font-size: 19px; font-weight: 700; color: var(--gold); }
 .sheet-head .sh-sub { font-size: 12px; color: var(--tx-4); }
 .sheet-close {
   margin-left: auto; background: none; border: none; cursor: pointer;
@@ -398,10 +420,10 @@ h1 {
   padding: 6px 13px;
   transition: color var(--t-fast) ease, border-color var(--t-fast) ease, background-color var(--t-fast) ease;
 }
-.chip-btn:hover { color: var(--tx-1); border-color: rgba(255,255,255,0.22); }
+.chip-btn:hover { color: var(--gold); border-color: rgba(255,209,102,0.4); }
 .chip-btn.on {
   color: var(--on-gold); font-weight: 700;
-  background: var(--gold); border-color: transparent;
+  background: var(--grad-gold); border-color: transparent; box-shadow: var(--sh-glow);
 }
 
 /* — заголовок ліги — */
@@ -426,12 +448,14 @@ h1 {
 .lvl-row.cur {
   opacity: 1; border-color: var(--lg2);
   background: linear-gradient(90deg, var(--lg-s), var(--lg-t));
+  box-shadow: 0 0 22px var(--lg-g);
 }
 .lvl-num {
   flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 800; color: #101114;
-  background: var(--lg);
+  font-size: 13px; font-weight: 800; color: var(--on-gold);
+  background: radial-gradient(circle at 35% 30%, var(--lg2), var(--lg));
+  box-shadow: 0 0 10px var(--lg-g);
 }
 .lvl-ic   { flex: 0 0 auto; font-size: 18px; }
 .lvl-name { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 700; color: var(--tx-1); }
@@ -448,7 +472,7 @@ h1 {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 4px; border-bottom: var(--bd-row);
 }
-.prog-row.today { background: rgba(255,255,255,0.035); border-radius: var(--r-sm); }
+.prog-row.today { background: rgba(255,209,102,0.06); border-radius: var(--r-sm); }
 .prog-date { flex: 0 0 80px; font-size: 12px; color: var(--tx-3); }
 .prog-med { margin-right: 3px; font-size: 11px; }
 .prog-cells { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
@@ -473,11 +497,11 @@ h1 {
 }
 .sec-h .add {
   margin-left: auto; cursor: pointer; font-family: inherit; font-size: 12px;
-  color: var(--tx-2); background: var(--solid-btn);
+  color: var(--gold); background: var(--solid-btn);
   border: var(--bd-accent); border-radius: var(--r-pill); padding: 2px 10px;
   transition: background-color var(--t-fast) ease;
 }
-.sec-h .add:hover { background: var(--solid-btn-hov); color: var(--tx); }
+.sec-h .add:hover { background: var(--solid-btn-hov); }
 
 /* — ціль — */
 .goal {
@@ -492,7 +516,7 @@ h1 {
 .goal-xp  { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--gold); }
 .goal-bar { height: 6px; margin: 7px 0 5px; border-radius: var(--r-pill); background: rgba(255,255,255,0.09); overflow: hidden; }
 .goal-fill{ height: 100%; border-radius: var(--r-pill); background: var(--grad-gold); transition: width var(--t-data) ease; }
-.goal.done .goal-fill { background: var(--st-done); }
+.goal.done .goal-fill { background: linear-gradient(180deg, #a8f0a8, var(--st-done)); }
 .goal-ctl { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--tx-4); }
 .goal-num {
   width: 62px; padding: 2px 6px; font-family: inherit; font-size: 12px;
@@ -506,7 +530,7 @@ h1 {
   border: var(--bd-ghost); border-radius: var(--r-sm); padding: 3px 7px;
   transition: color var(--t-fast) ease, border-color var(--t-fast) ease;
 }
-.mini:hover { color: var(--tx); border-color: rgba(255,255,255,0.22); }
+.mini:hover { color: var(--gold); border-color: rgba(255,209,102,0.4); }
 .mini.dz { margin-left: auto; }
 
 /* — кроки цілі — */
@@ -520,10 +544,9 @@ h1 {
 .step.on .step-t { text-decoration: line-through; color: var(--tx-5); }
 .step .ck {
   flex: 0 0 auto; cursor: pointer; padding: 0 2px; line-height: 1;
-  font-size: 15px; font-family: inherit; color: var(--tx-4);
+  font-size: 15px; font-family: inherit; color: var(--gold);
   background: none; border: none;
 }
-.step .ck:hover { color: var(--tx-1); }
 .step-t { flex: 1 1 auto; min-width: 0; }
 .step-n { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); }
 
@@ -555,7 +578,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 .task-x { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--c); }
 
 /* — налаштування — */
-.set-sect { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--tx-1); }
+.set-sect { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--gold); }
 .set-note { margin: -4px 0 12px; font-size: 11px; color: var(--tx-5); line-height: 1.5; }
 .set-block { margin-bottom: 26px; }
 .dif-edit {
@@ -584,19 +607,19 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 .gold-btn {
   width: 100%; margin-top: 10px; padding: 8px 12px; cursor: pointer;
   font-family: inherit; font-size: 13px; font-weight: 700; color: var(--gold);
-  background: rgba(227,170,78,0.14);
-  border: 1px solid rgba(227,170,78,0.40); border-radius: var(--r-btn);
-  transition: background-color var(--t-fast) ease;
+  background: linear-gradient(180deg, rgba(255,209,102,0.20), rgba(255,209,102,0.10));
+  border: 1px solid rgba(255,209,102,0.45); border-radius: var(--r-btn);
+  transition: background var(--t-fast) ease;
 }
-.gold-btn:hover { background: rgba(227,170,78,0.22); }
+.gold-btn:hover { background: linear-gradient(180deg, rgba(255,209,102,0.32), rgba(255,209,102,0.16)); }
 
 /* — банер: те, що має пережити перезавантаження — */
 #banner {
   position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 500;
   display: block;
   max-width: 92vw; padding: 10px 18px; cursor: pointer;
-  font-size: 13px; font-weight: 600; color: var(--on-gold);
-  background: var(--gold);
+  font-size: 13px; font-weight: 600; color: #2a1a05;
+  background: linear-gradient(180deg, #ffd08a, #ffa94d);
   border-radius: var(--r-pill); box-shadow: 0 10px 30px rgba(0,0,0,0.45);
 }
 
@@ -627,18 +650,19 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 }
 .seg-btn:hover { color: var(--tx-1); }
 .seg-btn.on {
-  color: var(--gold); border-color: rgba(227,170,78,0.55);
-  background: rgba(227,170,78,0.08);
+  color: var(--gold); border-color: var(--gold);
+  background: linear-gradient(0deg, rgba(255,209,102,0.10), rgba(255,209,102,0.10)), var(--solid-btn);
+  box-shadow: var(--sh-glow);
 }
 .seg-btn .ck { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; }
 
 /* — кнопка копії, коли копія стара або її немає — */
-.act.warn { color: var(--st-new); border-color: rgba(224,151,63,0.50); }
+.act.warn { color: var(--st-new); border-color: rgba(255,169,77,0.55); }
 
 /* — комірки дня клікабельні — */
 .pgc, .prog-date[data-pdif] { cursor: pointer; }
 .pgc:hover { filter: brightness(1.35); }
-.prog-date[data-pdif]:hover { color: var(--tx-1); }
+.prog-date[data-pdif]:hover { color: var(--gold); }
 
 /* — перелік зробленого — */
 .dlog {
@@ -700,7 +724,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 
   <!-- ЛІВА: прогрес по днях -->
   <aside class="panel" id="progress-panel">
-    <div class="panel-h">Прогрес по днях</div>
+    <div class="panel-h">📈 Прогрес по днях</div>
     <div class="panel-sub">Складності і XP за день · ✅ мінімум · 🥇 норма</div>
     <div class="scroll" id="prog-list"></div>
   </aside>
@@ -735,7 +759,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 
   <!-- ПРАВА: поточні задачі (рішення сесії 1 — рекорди переїхали в оверлей) -->
   <aside class="panel" id="open-panel">
-    <div class="panel-h">Цілі та задачі</div>
+    <div class="panel-h">🎯 Цілі та задачі</div>
     <div class="panel-sub">Довгі цілі з прогресом і те, що зараз у роботі</div>
     <div class="scroll">
       <div class="sec-h">ЦІЛІ<button class="add" id="goal-add">+ ціль</button></div>
@@ -756,16 +780,16 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 </div>
 
 <div id="wq-totals">
-  <div class="tot-h">ЗАГАЛЬНА СТАТИСТИКА</div>
+  <div class="tot-h">✦ ЗАГАЛЬНА СТАТИСТИКА ✦</div>
   <div id="tot-list"></div>
-  <button class="gold-btn" id="records-btn">Рекорди</button>
+  <button class="gold-btn" id="records-btn">🏆 Рекорди</button>
 </div>
 
 <div id="bottom-left-btns">
-  <button class="act" id="prog-btn">Прогрес по днях</button>
-  <button class="act" id="backup-btn">Зробити копію</button>
-  <button class="act" id="import-btn">Відновити</button>
-  <button class="act" id="settings-btn">Налаштування</button>
+  <button class="act" id="prog-btn">📈 Прогрес по днях</button>
+  <button class="act" id="backup-btn">💾 Зробити копію</button>
+  <button class="act" id="import-btn">📂 Відновити</button>
+  <button class="act" id="settings-btn">⚙️ Налаштування</button>
   <input type="file" id="import-file" class="hidden" accept="application/json,.json">
 </div>
 
@@ -774,7 +798,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   <div class="sheet">
     <div class="sheet-head">
       <div>
-        <h2>Сходи рівнів</h2>
+        <h2>🪜 Сходи рівнів</h2>
         <span class="sh-sub" id="lvl-sub"></span>
       </div>
       <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
@@ -788,7 +812,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   <div class="sheet">
     <div class="sheet-head">
       <div>
-        <h2>Рекорди</h2>
+        <h2>🏆 Рекорди</h2>
         <span class="sh-sub">особисті максимуми</span>
       </div>
       <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
@@ -805,7 +829,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
   <div class="sheet">
     <div class="sheet-head">
       <div>
-        <h2>Налаштування</h2>
+        <h2>⚙️ Налаштування</h2>
         <span class="sh-sub">складності, плани, дані</span>
       </div>
       <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
@@ -818,7 +842,7 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 <div id="goal-modal" class="hidden">
   <div class="sheet" style="height:auto;max-height:86vh">
     <div class="sheet-head">
-      <div><h2>Нова ціль</h2><span class="sh-sub">із прогресом і XP за виконання</span></div>
+      <div><h2>🎯 Нова ціль</h2><span class="sh-sub">із прогресом і XP за виконання</span></div>
       <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
     </div>
     <div class="sheet-body">
@@ -1825,7 +1849,7 @@ function doBackup() {
   downloadJSON("workquest_backup_" + day + ".json", getBackupData());
   lsSet(K.backupAt, day);
   refresh("backup");
-  toast("Копію збережено");
+  toast("💾 Копію збережено");
 }
 
 // Вік копії рахується РІЗНИЦЕЮ КЛЮЧІВ ДАТ, а не (Date.now() − parse(дата)):
@@ -1925,13 +1949,12 @@ function renderXp() {
   hex.textContent = info.n;
   hex.style.setProperty("--lvl", info.league.color);
   hex.style.setProperty("--lvl2", info.league.color2);
-  hex.style.setProperty("--lvl-b", hexToRgba(info.league.color, 0.40));
   $("xp-name").textContent = info.name.toUpperCase();
   $("xp-nums").textContent = info.isMax
     ? fmtXpNum(info.xp) + " XP · максимум"
     : fmtXpNum(info.xp) + " / " + fmtXpNum(info.next) + " XP";
   $("xp-fill").style.width = info.pct + "%";
-  $("xp-league").textContent = "ЛІГА · " + info.league.name.toUpperCase();
+  $("xp-league").textContent = info.league.icon + " ЛІГА · " + info.league.name.toUpperCase();
 }
 
 // Перемикач «Що зробив / Що зробити» — сегментований, як у референсі:
@@ -1956,9 +1979,9 @@ function renderBackupBtn() {
   const age = backupAgeDays();
   const b = $("backup-btn");
   b.classList.remove("warn");
-  if (age === null) { b.textContent = "Зробити копію"; b.classList.add("warn"); return; }
-  if (age === 0) { b.textContent = "Копія сьогодні ✓"; return; }
-  b.textContent = "Копія " + age + " " + plural(age, "день", "дні", "днів") + " тому";
+  if (age === null) { b.textContent = "💾 Зробити копію"; b.classList.add("warn"); return; }
+  if (age === 0) { b.textContent = "💾 Копія сьогодні ✓"; return; }
+  b.textContent = "💾 Копія " + age + " " + plural(age, "день", "дні", "днів") + " тому";
   if (age > 3) { b.textContent += " ⚠"; b.classList.add("warn"); }
 }
 
@@ -1980,7 +2003,7 @@ function renderToday() {
     plural(s.today.done, "задача", "задачі", "задач"), '</span>',
     '<span class="chip"><b>', fmtXpNum(s.today.xp), '</b> XP</span>',
     '<span class="chip">🔥 серія <b>', s.streak.current, '</b></span>',
-    '<span class="chip', (normaMet ? ' gold' : ''), '" title="Денна норма — план задач на день (Налаштування)">🥇 норма <b>',
+    '<span class="chip', (normaMet ? ' gold' : ''), '" title="Денна норма — план задач на день (⚙️)">🥇 норма <b>',
     s.today.done, '</b>/', perDay,
     (s.streak.norma > 1 ? ' · ' + s.streak.norma + ' дн.' : ''), '</span>'
   ];
@@ -1998,7 +2021,7 @@ function renderDifRow() {
     h.push(
       '<button class="dif-btn" data-dif="', escAttr(d.id), '" style="', st, '" title="',
       escAttr(DIF_HINTS[d.id] || ""), '">',
-      '<span class="dot"></span>',
+      '<span>', esc(d.icon), '</span>',
       '<span class="n">', esc(d.name), '</span>',
       '<span class="xp">+', d.xp | 0, '</span>',
       '</button>'
@@ -2011,26 +2034,23 @@ function renderTotals() {
   const s = S();
   const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
   const h = [];
-  // Хром без емодзі (DESIGN.md §5): складність позначає крапка її кольору,
-  // решта рядків — просто текст.
-  const row = (ic, label, val) => h.push(
-    '<div class="tot-r">', (ic || ''), '<span class="l">', esc(label),
-    '</span><span class="v">', esc(String(val)), '</span></div>'
+  const row = (ic, label, val, color) => h.push(
+    '<div class="tot-r"><span>', ic, '</span><span class="l"', (color ? ' style="color:' + color + '"' : ''),
+    '>', esc(label), '</span><span class="v">', esc(String(val)), '</span></div>'
   );
-  const dot = (c) => '<span class="dot" style="background:' + c + '"></span>';
-  row("", "Задач виконано", s.tasks.done);
+  row("✅", "Задач виконано", s.tasks.done);
   for (const d of difs) {
     const n = s.tasks.doneByDiff[d.id] || 0;
-    if (n) row(dot(d.color), d.name, n);
+    if (n) row(d.icon, d.name, n, d.color);
   }
-  if (s.goals.done) row("", "Цілей досягнуто", s.goals.done);
-  row("", "Усього XP", fmtXpNum(s.xp.total));
-  row("", "Днів активності", s.days.active);
-  row("", "Поточна серія", s.streak.current);
-  row("", "Найдовша серія", s.streak.best);
-  row("", "Сер. задач/день", s.avg.donePerCalendarDay.toFixed(1));
-  row("", "Сер. задач/місяць", s.avg.donePerMonth.toFixed(1));
-  row("", "Найкращий день тижня", s.weekday.best.idx >= 0 ? s.weekday.best.name : "—");
+  if (s.goals.done) row("🎯", "Цілей досягнуто", s.goals.done);
+  row("⚡", "Усього XP", fmtXpNum(s.xp.total));
+  row("📆", "Днів активності", s.days.active);
+  row("🔥", "Поточна серія", s.streak.current);
+  row("🏅", "Найдовша серія", s.streak.best);
+  row("📊", "Сер. задач/день", s.avg.donePerCalendarDay.toFixed(1));
+  row("📊", "Сер. задач/місяць", s.avg.donePerMonth.toFixed(1));
+  row("🗓", "Найкращий день тижня", s.weekday.best.idx >= 0 ? s.weekday.best.name : "—");
   $("tot-list").innerHTML = h.join("");
 }
 
@@ -2051,11 +2071,11 @@ function progRow(label, agg, isToday, days, med) {
     if (!n) continue;
     const st = ["--c:", d.color, ";--c-t:", hexToRgba(d.color, 0.14), ";--c-b:", hexToRgba(d.color, 0.38)].join("");
     h.push('<span class="pgc" style="', st, '" data-pdif="', escAttr(d.id), '" title="',
-           escAttr(d.name + " — показати перелік"), '">', n, '</span>');
+           escAttr(d.name + " — показати перелік"), '">', esc(d.icon), ' ', n, '</span>');
   }
   if (agg.goals) {
     h.push('<span class="pgc" data-pdif="__goals" title="Цілі — показати перелік"',
-           ' style="--c:#e3aa4e;--c-t:rgba(227,170,78,0.14);--c-b:rgba(227,170,78,0.38)">', agg.goals, '</span>');
+           ' style="--c:#ffd166;--c-t:rgba(255,209,102,0.14);--c-b:rgba(255,209,102,0.38)">🎯 ', agg.goals, '</span>');
   }
   h.push('</span><span class="prog-xp">+', fmtXpNum(agg.xp), '</span></div>');
   return h.join("");
