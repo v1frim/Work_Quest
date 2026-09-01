@@ -71,17 +71,19 @@
   /* — радіуси — */
   --r-card: 20px; --r-box: 14px; --r-btn: 12px; --r-sm: 8px; --r-pill: 999px;
 
-  /* — геометрія. ⚠️ Міняєш --w-left → перерахуй --balance (= --w-left − --w-right),
-       інакше центральна картка з'їде вбік. — */
+  /* — геометрія. Усі три колонки однакової ширини (рішення користувача).
+       ⚠️ Розійдуться ширини → перерахуй --balance (= --w-left − --w-right)
+       і --shift (= (--w-left + --gap-col) / 2), інакше центральна картка
+       з'їде вбік, коли одну з панелей сховано. — */
   --gap-col:   24px;
   --pad-page:  20px;
   --pad-card:  30px 32px;
   --pad-panel: 20px 20px;
   --w-card:    460px;
-  --w-left:    440px;
-  --w-right:   420px;
-  --balance:   20px;
-  --shift:     222px;
+  --w-left:    460px;
+  --w-right:   460px;
+  --balance:   0px;
+  --shift:     242px;
   --fix-inset: 18px;
 
   /* — час — */
@@ -590,6 +592,7 @@ h1 {
 }
 .step-t { flex: 1 1 auto; min-width: 0; }
 .step-n { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); }
+.step-link { flex: 0 0 auto; padding: 0 4px; font-size: 12px; color: var(--gold); cursor: default; }
 
 /* — редактор кроків у модалці цілі — */
 .sedit-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
@@ -616,6 +619,11 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 }
 /* Сам рядок задачі. Обгортка потрібна, бо під ним тепер живе дерево кроків. */
 .task-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 6px; }
+/* Звідки прийшла задача. Окремим рядком: у ряд кнопок це вже не влізало. */
+.task-link {
+  margin-top: 5px; font-size: 11px; line-height: 1.4;
+  color: var(--gc, var(--gold)); overflow-wrap: anywhere;
+}
 .task .exp { padding: 2px 6px; }
 .task-t { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--tx-1); }
 .task-x { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--c); }
@@ -1276,6 +1284,12 @@ function sanitizeData() {
     } else if (t.doneDay || t.xpAwarded != null || t.difSnap) {
       t.doneDay = null; t.xpAwarded = null; t.difSnap = null; fixed++;
     }
+    // Звʼязок із кроком цілі: або два рядки, або два null — половина
+    // звʼязку не має сенсу і зламала б syncLinkedStep.
+    if (typeof t.goalId !== "string" || typeof t.stepId !== "string") {
+      if (t.goalId != null || t.stepId != null) fixed++;
+      t.goalId = null; t.stepId = null;
+    }
     // Кроки в задачі — така сама форма, як у цілі: «крок → підкроки».
     if (!Array.isArray(t.steps)) { t.steps = []; fixed++; }
     for (const st of t.steps) {
@@ -1592,19 +1606,63 @@ function addDone(title, difId) {
 }
 
 // Планова задача: створюється відкритою, закривається пізніше.
-function addOpen(title, difId) {
+function addOpen(title, difId, link) {
   const t = String(title || "").trim().slice(0, 200);
   if (!t) return false;
   const tasks = loadTasks();
   tasks.push({
     id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [], steps: [],
+    // Звʼязок із кроком цілі. null у звичайної задачі — поле є завжди,
+    // щоб не плодити перевірок «а раптом властивості немає».
+    goalId: (link && link.goalId) || null,
+    stepId: (link && link.stepId) || null,
     createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null, difSnap: null
   });
   saveTasks(tasks);
   lsSet(K.lastDif, difId);
   commit();
-  toast("↗ відкладено · " + getDif(difId).name);
+  if (!link) toast("↗ відкладено · " + getDif(difId).name);   // у promoteStep свій тост
   return true;
+}
+
+/* ── Крок цілі → задача в роботі ──
+   ⚠️ Звʼязок ДВОСТОРОННІЙ і симетричний: закрив задачу — закрився крок,
+   скасував — крок відкрився назад. Інакше довелось би відмічати те саме
+   двічі, і рано чи пізно ціль і панель задач розійшлись би. */
+function linkedOpenTask(stepId) {
+  return loadTasks().find(t => !tDone(t) && t.stepId === stepId) || null;
+}
+function promoteStep(goalId, stepId) {
+  const g = loadGoals().find(x => x.id === goalId);
+  if (!g) return false;
+  const f = findStep(g, stepId);
+  if (!f) return false;
+  if (linkedOpenTask(stepId)) { toast("↗ цей крок уже в роботі"); return false; }
+  // Складність береться остання вжита — питати її тут означало б ще одне
+  // вікно на шляху, який має бути в один клік.
+  const act = activeDifs();
+  const last = lsGet(K.lastDif, "");
+  const d = act.find(x => x.id === last) || act[0];
+  if (!d) return false;
+  addOpen(f.st.title, d.id, { goalId, stepId });
+  toast("↗ у роботі · " + g.title);
+  return true;
+}
+// Проставити крок, звʼязаний із задачею, у той самий стан. Викликається
+// з completeTask/uncompleteTask — тобто з єдиних точок зміни статусу задачі.
+function syncLinkedStep(t, done) {
+  if (!t.goalId || !t.stepId) return;
+  const goals = loadGoals();
+  const g = goals.find(x => x.id === t.goalId);
+  if (!g) return;
+  const f = findStep(g, t.stepId);
+  if (!f || !!f.st.done === !!done) return;
+  f.st.done = !!done;
+  if (!f.parent && Array.isArray(f.st.subs)) for (const sb of f.st.subs) sb.done = !!done;
+  if (f.parent) f.parent.done = (f.parent.subs || []).every(x => x.done);
+  const r = syncGoalDone(g);
+  saveGoals(goals);
+  if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
 }
 
 function completeTask(id) {
@@ -1618,6 +1676,7 @@ function completeTask(id) {
   t.xpAwarded = d.xp | 0;
   t.difSnap = { name: d.name, color: d.color, icon: d.icon };
   saveTasks(tasks);
+  syncLinkedStep(t, true);
   commit();
   toast("+" + (d.xp | 0) + " XP · " + d.name);
 }
@@ -1630,6 +1689,7 @@ function uncompleteTask(id) {
   if (!t || !tDone(t)) return;
   t.doneAt = null; t.doneDay = null; t.xpAwarded = null; t.difSnap = null;
   saveTasks(tasks);
+  syncLinkedStep(t, false);
   commit();
 }
 function editTaskTitle(id, title) {
@@ -2322,11 +2382,31 @@ function draftRow(isSub) {
   ].join("");
 }
 
+// Позначка «ця задача — крок ось цієї цілі». Ціль могли видалити, тож
+// підпис деградує чесно, а не зникає мовчки.
+function linkHtml(t) {
+  if (!t.goalId) return '';
+  const g = loadGoals().find(x => x.id === t.goalId);
+  const tier = g ? goalTier(g) : null;
+  return ['<div class="task-link"', (tier ? ' style="--gc:' + tier.color + '"' : ''), '>',
+    '🎯 ', esc(g ? g.title : "ціль видалено"), '</div>'].join("");
+}
+
 // Дерево кроків малюється однаково для цілі й для задачі — розмітка спільна,
 // тож і обробник кліків потім один (bindSteps).
-function stepsHtml(o, note) {
+function stepsHtml(kind, o, note) {
   const dr = (_stepDraft && _stepDraft.ownerId === o.id) ? _stepDraft : null;
   const steps = o.steps || [];
+  // Винести можна лише ЛИСТОК: крок із підкроками — це контейнер, задача
+  // з нього була б розмитою. І лише з цілі: задача в задачу не виноситься.
+  const inWork = new Set();
+  if (kind === "goal") for (const t of loadTasks()) if (!tDone(t) && t.stepId) inWork.add(t.stepId);
+  const promo = (st, isLeaf) => {
+    if (kind !== "goal" || !isLeaf || st.done) return '';
+    return inWork.has(st.id)
+      ? '<span class="step-link" title="Уже в роботі">↗</span>'
+      : '<button class="mini" data-sact="tolist" title="Винести в задачі">↗</button>';
+  };
   const h = ['<div class="steps">'];
   if (note) h.push('<div class="steps-note">', esc(note), '</div>');
   if (!steps.length && !dr) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
@@ -2337,6 +2417,7 @@ function stepsHtml(o, note) {
       '<button class="ck" data-sact="toggle">', (st.done ? '☑' : '☐'), '</button>',
       '<span class="step-t">', esc(st.title), '</span>',
       (hasSubs ? '<span class="step-n">' + st.subs.filter(x => x.done).length + '/' + st.subs.length + '</span>' : ''),
+      promo(st, !hasSubs),
       '<button class="mini" data-sact="addsub" title="Додати підкрок">+</button>',
       '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
       '</div>'
@@ -2346,6 +2427,7 @@ function stepsHtml(o, note) {
         '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
         '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
         '<span class="step-t">', esc(sb.title), '</span>',
+        promo(sb, true),
         '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
         '</div>'
       );
@@ -2431,7 +2513,7 @@ function renderGoals() {
         ? "план: " + lv.filter(x => x.done).length + " / " + lv.length +
           " · на прогрес цілі не впливає"
         : "план цілі · на прогрес не впливає");
-      h.push(stepsHtml(g, note));
+      h.push(stepsHtml("goal", g, note));
     }
     h.push('</div>');
   }
@@ -2474,9 +2556,10 @@ function renderOpen() {
       '<button class="mini" data-tact="edit" title="Редагувати">✎</button>',
       '<button class="mini" data-tact="del">🗑</button>',
       '</div>',
+      linkHtml(t),
       // ⚠️ Кроки задачі НЕ закривають її самі: XP дає складність, і момент
       // нарахування має лишатись за користувачем (кнопка ✓).
-      (open ? stepsHtml(t, "підзадачі · задачу закриваєш ти кнопкою ✓") : ''),
+      (open ? stepsHtml("task", t, "підзадачі · задачу закриваєш ти кнопкою ✓") : ''),
       '</div>'
     );
   }
@@ -2819,6 +2902,7 @@ function bindSteps(listId, kind) {
     if (act === "toggle") toggleStep(kind, oid, sid);
     else if (act === "del") delStep(kind, oid, sid);
     else if (act === "addsub") openStepDraft(kind, oid, sid);
+    else if (act === "tolist") promoteStep(oid, sid);
   });
   // Enter лишає чернетку відкритою — серію кроків можна надрукувати
   // не торкаючись миші.

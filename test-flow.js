@@ -52,7 +52,11 @@ const finish = (code, msg) => {
   if (msg) console.log(msg);
   process.exit(code);
 };
-const guard = setTimeout(() => finish(0, "⏭  перевірка циклу пропущена: таймаут"), 60000);
+// ⚠️ Таймаут — це ПАДІННЯ, не пропуск. Сценарій, що завис (наприклад, на
+// confirm() у безголовому браузері), інакше тихо проходив би як «ок» і
+// пускав у прод неперевірений код. Пропуск лишається тільки за відсутності
+// браузера — там перевіряти справді нічим.
+const guard = setTimeout(() => finish(1, "❌ ЦИКЛ: сценарій завис (таймаут 90 с)"), 90000);
 guard.unref && guard.unref();
 
 let buf = "";
@@ -67,6 +71,9 @@ child.on("error", (e) => finish(0, "⏭  перевірка циклу проп�
 const SCRIPT = `(function () {
   const out = [];
   const ok = (name, got, want) => out.push({ name, got, want, pass: String(got) === String(want) });
+  // ⚠️ confirm() у безголовому браузері нічого не питає й блокує сценарій
+  // назавжди — стенд відповідає «так» за користувача.
+  window.confirm = () => true;
   try {
     localStorage.clear();
 
@@ -383,7 +390,64 @@ const SCRIPT = `(function () {
     ok("XP дає складність, не кроки", S().xp.total, activeDifs()[0].xp);
     ok("кроки пережили закриття задачі", loadTasks()[0].steps.length, 1);
 
-    // 17. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
+    // 17. Крок цілі → задача, і звʼязок працює в обидва боки.
+    localStorage.clear();
+    addGoalSteps("Ціль зі звʼязком", [
+      { title: "Крок А", subs: ["А1", "А2"] },
+      { title: "Крок Б", subs: [] }
+    ], 300);
+    const gl = loadGoals()[0];
+    _rowOpen.add(gl.id); refresh();
+    const leafA1 = gl.steps[0].subs[0].id, leafB = gl.steps[1].id;
+    ok("кнопка ↗ є в підкроку",
+       document.querySelector('[data-step="' + leafA1 + '"] [data-sact="tolist"]') !== null, true);
+    ok("кнопки ↗ немає в кроку з підкроками",
+       document.querySelector('[data-step="' + gl.steps[0].id + '"] [data-sact="tolist"]'), null);
+    document.querySelector('[data-step="' + leafA1 + '"] [data-sact="tolist"]').click();
+    const lt = loadTasks()[0];
+    ok("задачу створено з кроку", loadTasks().length, 1);
+    ok("назва перенеслась", lt.title, "А1");
+    ok("задача памʼятає ціль", lt.goalId, gl.id);
+    ok("задача памʼятає крок", lt.stepId, leafA1);
+    ok("задача відкрита", tDone(lt), false);
+    ok("позначка прив'язки в розмітці",
+       document.getElementById("open-list").innerHTML.indexOf("Ціль зі звʼязком") >= 0, true);
+    ok("повторно той самий крок не виноситься", (promoteStep(gl.id, leafA1), loadTasks().length), 1);
+    ok("↗ замінилось на позначку",
+       document.querySelector('[data-step="' + leafA1 + '"] .step-link') !== null, true);
+
+    // ⚠️ Закрив задачу — закрився крок цілі.
+    completeTask(lt.id);
+    ok("крок цілі закрився разом із задачею", findStep(loadGoals()[0], leafA1).st.done, true);
+    ok("прогрес цілі зріс", goalProgress(loadGoals()[0]).cur, 1);
+    // ⚠️ І симетрично назад.
+    uncompleteTask(lt.id);
+    ok("крок відкрився назад", findStep(loadGoals()[0], leafA1).st.done, false);
+    ok("прогрес цілі повернувся", goalProgress(loadGoals()[0]).cur, 0);
+
+    // Останній крок через задачу закриває ціль і нараховує її XP рівно раз.
+    promoteStep(gl.id, leafB);
+    const tB = loadTasks().find(x => x.stepId === leafB);
+    toggleStep("goal", gl.id, gl.steps[0].subs[1].id);
+    completeTask(lt.id);
+    completeTask(tB.id);
+    ok("ціль досягнута через задачі", loadGoals()[0].doneAt > 0, true);
+    ok("XP цілі нараховано один раз", loadGoals()[0].xpAwarded, 300);
+
+    // Видалена ціль не ламає рядок задачі.
+    localStorage.clear();
+    addGoal("Тимчасова ціль", 5, "шт", 100, 0);
+    const gt = loadGoals()[0];
+    addStep("goal", gt.id, "Одноразовий крок", null);
+    promoteStep(gt.id, loadGoals()[0].steps[0].id);
+    deleteGoal(gt.id);
+    ok("задача пережила видалення цілі", loadTasks().length, 1);
+    ok("позначка деградує чесно",
+       document.getElementById("open-list").innerHTML.indexOf("ціль видалено") >= 0, true);
+    completeTask(loadTasks()[0].id);
+    ok("задача без цілі закривається", loadTasks()[0].doneAt > 0, true);
+
+    // 18. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
     // Це саме та регресія, яку не видно в жодному числі, крім координат:
     // до фіксу висота сітки росла й вертикальне центрування зсувало все вгору.
     localStorage.clear();
