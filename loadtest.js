@@ -160,6 +160,7 @@ const sandbox = Object.assign(Object.create(null), windowMock, {
   File: function () {},
   FileReader: function () { return { readAsText() {}, addEventListener() {} }; },
   URL: { createObjectURL: () => "", revokeObjectURL() {} },
+  URLSearchParams,
   fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve({}), text: () => Promise.resolve("") }),
 });
 sandbox.globalThis = sandbox;
@@ -173,13 +174,25 @@ for (const f of ["config.js", "tasks.js"]) {
   catch (e) { console.log("❌ СТЕНД (" + f + "): " + e.message); process.exit(1); }
 }
 
-// ── головний inline-скрипт = найдовший без src ──────────────────────────────
+// ── усі inline-скрипти в порядку документа, як їх виконує браузер ───────────
+// ⚠️ Виконувати ЛИШЕ найдовший (як робив стенд еталона) — неправильно: ранній
+// скрипт оголошує через `var` глобалі (LS_OK, todFor), якими користується
+// головний. Прогін одного головного давав би фальшивий ReferenceError.
 const scripts = [...HTML.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 if (!scripts.length) {
   console.log("⏳ стенд завантаження — inline-скриптів ще немає");
   process.exit(0);
 }
 const main = scripts.reduce((a, b) => (b.length > a.length ? b : a));
+for (const s of scripts) {
+  if (s === main) continue;                       // головний іде останнім, разом із probe
+  try { vm.runInContext(s, ctx, { filename: "index.html:early" }); }
+  catch (e) {
+    const st = e && e.stack ? e.stack.split("\n").slice(0, 4).join("\n") : String(e);
+    console.log("❌ СТЕНД (ранній скрипт): " + st);
+    process.exit(1);
+  }
+}
 
 // ⚠️ top-level const/let у vm НЕ стають властивостями контексту — тож дані
 // знімаємо probe-хвостом, дописаним до самого скрипта. Він же ВИКЛИКАЄ S() і
