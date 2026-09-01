@@ -26,7 +26,8 @@ const DEFAULT_DIFFICULTIES = [
   { id: "d_hard",    name: "Складна",  icon: "🟠", color: "#ffa94d", xp: 100, order: 6, archived: false },
   { id: "d_big",     name: "Велика",   icon: "🔴", color: "#ff6b6b", xp: 180, order: 7, archived: false },
   { id: "d_heavy",   name: "Важка",    icon: "⛏", color: "#d98f4b", xp: 320, order: 8, archived: false },
-  { id: "d_epic",    name: "Епічна",   icon: "💎", color: "#ffd166", xp: 600, order: 9, archived: false }
+  { id: "d_epic",    name: "Епічна",   icon: "💎", color: "#ffd166", xp: 600, order: 9, archived: false },
+  { id: "d_titan",   name: "Монументальна", icon: "🏔", color: "#e05c8f", xp: 1200, order: 10, archived: false }
 ];
 
 /* Орієнтир за витраченим часом (сесія 1, запит користувача — «від суперлегких
@@ -34,14 +35,16 @@ const DEFAULT_DIFFICULTIES = [
 const DIF_HINTS = {
   d_instant: "до 10 хв",  d_small: "до 30 хв",  d_easy: "близько години",
   d_normal:  "2–3 години", d_notable: "півдня",  d_hard: "робочий день",
-  d_big:     "2–3 дні",    d_heavy: "тиждень",   d_epic: "тижні"
+  d_big:     "2–3 дні",    d_heavy: "тиждень",   d_epic: "2–3 тижні",
+  d_titan:   "місяць і більше"
 };
 
 /* Палітра, яку пропонує кольоровий пікер при створенні нової складності.
    Усі кольори перевірені на контраст у всіх чотирьох фазах доби. */
 const DIF_PALETTE = [
   "#7be07b", "#87b4ff", "#ffa94d", "#ff6b6b", "#c89bff",
-  "#2dd4bf", "#f78fb3", "#ffd166", "#8fd3ff", "#7fdd40"
+  "#2dd4bf", "#f78fb3", "#ffd166", "#8fd3ff", "#7fdd40",
+  "#e05c8f", "#d98f4b", "#a3e635", "#38bdf8", "#fb923c"
 ];
 
 /* Плейсхолдер для складності, якої більше немає в реєстрі (третій фолбек getDif). */
@@ -218,6 +221,9 @@ const ACHIEVEMENTS = [
 
   { id: "a_big",    icon: "💎", title: "Важкоатлет",      desc: "Виконано «Епічних» задач",
     metric: "tasks.doneByDiff.d_epic", tiers: [1, 3, 10, 25, 60, 150] },
+
+  { id: "a_titan",  icon: "🏔", title: "Монумент",       desc: "Виконано «Монументальних» задач",
+    metric: "tasks.doneByDiff.d_titan", tiers: [1, 2, 5, 12, 30, 75] },
 
   { id: "a_goals",  icon: "🎯", title: "Цілеспрямований",  desc: "Досягнуто цілей",
     metric: "goals.done",      tiers: [1, 5, 15, 40, 100, 250] },

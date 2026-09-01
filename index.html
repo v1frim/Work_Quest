@@ -372,7 +372,7 @@ h1 {
 }
 #xp-section:hover { background: rgba(255,209,102,0.07); }
 
-#levels-overlay, #records-overlay, #settings-overlay, #goal-modal {
+#levels-overlay, #records-overlay, #settings-overlay, #goal-modal, #day-modal {
   position: fixed; inset: 0; z-index: 300;
   display: flex; align-items: center; justify-content: center; padding: 24px;
   background: var(--scrim);
@@ -571,6 +571,44 @@ h1 {
 .toast-i.big { font-size: 16px; padding: 12px 24px; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
+
+/* — сегментований перемикач режиму запису — */
+.seg-cap { font-size: 10px; letter-spacing: 1.6px; color: var(--tx-6); margin: 0 0 6px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.seg-btn {
+  position: relative; padding: 11px 12px; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 700; color: var(--tx-3);
+  background: var(--solid-btn); border: var(--bd-ghost); border-radius: var(--r-btn);
+  transition: color var(--t-fast) ease, border-color var(--t-fast) ease, background-color var(--t-fast) ease;
+}
+.seg-btn:hover { color: var(--tx-1); }
+.seg-btn.on {
+  color: var(--gold); border-color: var(--gold);
+  background: linear-gradient(0deg, rgba(255,209,102,0.10), rgba(255,209,102,0.10)), var(--solid-btn);
+  box-shadow: var(--sh-glow);
+}
+.seg-btn .ck { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; }
+
+/* — кнопка копії, коли копія стара або її немає — */
+.act.warn { color: var(--st-new); border-color: rgba(255,169,77,0.55); }
+
+/* — комірки дня клікабельні — */
+.pgc, .prog-date[data-pdif] { cursor: pointer; }
+.pgc:hover { filter: brightness(1.35); }
+.prog-date[data-pdif]:hover { color: var(--gold); }
+
+/* — перелік зробленого — */
+.dlog {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 10px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.03);
+  border: var(--bd-ghost); border-left: 3px solid var(--c); border-radius: var(--r-btn);
+}
+.dlog-ic   { flex: 0 0 auto; }
+.dlog-t    { flex: 1 1 auto; min-width: 0; font-size: 14px; color: var(--tx-1); }
+.dlog-when { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); }
+.dlog-xp   { flex: 0 0 auto; font-size: 12px; font-weight: 700; color: var(--c); }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    F. ⚠️ ПАРНІ ПРАВИЛА .hidden — БЛОК ОБОВ'ЯЗКОВИЙ
    .hidden має специфічність (0,0,1,0), тож будь-яке правило з ID, що задає
@@ -587,6 +625,7 @@ h1 {
 #records-overlay.hidden   { display: none; }
 #settings-overlay.hidden  { display: none; }
 #goal-modal.hidden        { display: none; }
+#day-modal.hidden         { display: none; }
 #toast.hidden             { display: none; }
 #open-panel.hidden        { display: none; }
 
@@ -641,6 +680,9 @@ h1 {
       <div class="xp-league" id="xp-league"></div>
     </div>
 
+    <p class="seg-cap">РЕЖИМ ЗАПИСУ</p>
+    <div class="seg" id="mode-row"></div>
+
     <p class="ask" id="ask-label">ЩО ЗРОБИВ?</p>
     <input class="field" id="task-input" type="text" placeholder="Назва задачі…" autocomplete="off">
     <div class="dif-row" id="dif-row"></div>
@@ -680,6 +722,7 @@ h1 {
   <button class="act" id="backup-btn">💾 Зробити копію</button>
   <button class="act" id="import-btn">📂 Відновити</button>
   <button class="act" id="settings-btn">⚙️ Налаштування</button>
+  <input type="file" id="import-file" class="hidden" accept="application/json,.json">
 </div>
 
 <!-- ═══ ОВЕРЛЕЙ «СХОДИ РІВНІВ» ═══ -->
@@ -749,6 +792,17 @@ h1 {
         <button class="act" id="g-save" style="width:auto">Створити ціль</button>
         <button class="mini" data-act="close">Скасувати</button></div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ МОДАЛКА «ЩО САМЕ ЗРОБЛЕНО» ═══ -->
+<div id="day-modal" class="hidden">
+  <div class="sheet" style="height:auto;max-height:80vh">
+    <div class="sheet-head">
+      <div><h2 id="day-title">День</h2><span class="sh-sub" id="day-sub"></span></div>
+      <button class="sheet-close" data-act="close" aria-label="Закрити">✕</button>
+    </div>
+    <div class="sheet-body" id="day-body"></div>
   </div>
 </div>
 
@@ -838,6 +892,7 @@ const WQ_KEYS = {
   recOpen:   { key: "workquest_rec_open_v1",     klass: "ui" },
   recPeriod: { key: "workquest_rec_period_v1",   klass: "ui" },
   lastDif:   { key: "workquest_last_dif_v1",     klass: "ui" },
+  mode:      { key: "workquest_mode_v1",         klass: "ui" },
   sfx:       { key: "workquest_sfx_v1",          klass: "ui" },
 
   seeded:    { key: "workquest_seed_v1",         klass: "flag" }
@@ -1257,7 +1312,9 @@ function addOpen(title, difId) {
     createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null, difSnap: null
   });
   saveTasks(tasks);
+  lsSet(K.lastDif, difId);
   commit();
+  toast("↗ відкладено · " + getDif(difId).name);
   return true;
 }
 
@@ -1294,6 +1351,19 @@ function deleteTask(id) {
   tasks.splice(i, 1);
   saveTasks(tasks);
   commit();
+}
+
+/* Режим запису: "done" — задача одразу виконана, "todo" — відкладена в панель
+   справа. Перемикач над полем вводу; вибір зберігається між сесіями. */
+function curMode() { return lsGet(K.mode, "done") === "todo" ? "todo" : "done"; }
+function setMode(m) {
+  lsSet(K.mode, m === "todo" ? "todo" : "done");
+  refresh("mode", "difs");
+  $("task-input").focus();
+}
+// Одна точка входу для обох режимів — щоб клік і Enter не розійшлись у поведінці.
+function addByMode(title, difId) {
+  return curMode() === "todo" ? addOpen(title, difId) : addDone(title, difId);
 }
 
 /* — цілі — */
@@ -1359,6 +1429,92 @@ function toast(text, big) {
   setTimeout(() => el.remove(), big ? 3200 : 1900);
 }
 
+/* ─── §8b · БЕКАП І ВІДНОВЛЕННЯ ────────────────────────────────────────────
+   ⚠️ Значення зберігаються СИРИМИ рядками: битий JSON одного ключа не має
+   валити весь імпорт. BACKUP_KEYS генерується з WQ_KEYS, тож новий ключ
+   потрапляє в копію автоматично — «забув додати» неможливе за побудовою. */
+const BACKUP_FORMAT = 1;
+
+function getBackupData() {
+  const o = { __wq: BACKUP_FORMAT, __ts: new Date().toISOString(), __schema: WQ_SCHEMA };
+  for (const k of BACKUP_KEYS) {
+    const v = lsGet(k, null);
+    if (v !== null) o[k] = v;
+  }
+  return JSON.stringify(o, null, 2);
+}
+
+function downloadJSON(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function doBackup() {
+  const day = todayKey();
+  downloadJSON("workquest_backup_" + day + ".json", getBackupData());
+  lsSet(K.backupAt, day);
+  refresh("backup");
+  toast("💾 Копію збережено");
+}
+
+// Вік копії рахується РІЗНИЦЕЮ КЛЮЧІВ ДАТ, а не (Date.now() − parse(дата)):
+// друге дає «0 днів» о 23:59 і «1 день» о 00:01 тієї самої ночі.
+function backupAgeDays() {
+  const d = lsGet(K.backupAt, "");
+  if (!d || d.length !== 10) return null;
+  return dayNum(todayKey()) - dayNum(d);
+}
+
+function doRestore(text) {
+  let obj;
+  try { obj = JSON.parse(text); }
+  catch (e) { console.error("[restore] битий JSON", e); alert(WQ_TEXT.errBadFile); return; }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj) || !obj.__wq) { alert(WQ_TEXT.errBadFile); return; }
+
+  // Whitelist: беремо ЛИШЕ відомі ключі, кожен перевіряємо окремо.
+  const good = {}; let broken = 0, taskN = 0, goalN = 0;
+  for (const k of BACKUP_KEYS) {
+    if (!(k in obj)) continue;
+    const raw = obj[k];
+    if (typeof raw !== "string") { broken++; continue; }
+    try {
+      const v = JSON.parse(raw);
+      if (k === K.tasks) { if (!Array.isArray(v)) { broken++; continue; } taskN = v.length; }
+      if (k === K.goals) { if (!Array.isArray(v)) { broken++; continue; } goalN = v.length; }
+      good[k] = raw;
+    } catch (e) {
+      // Не мовчимо: рахуємо й показуємо, скільки ключів не вдалось прочитати.
+      console.error("[restore] битий ключ " + k, e);
+      broken++;
+    }
+  }
+  if (!Object.keys(good).length) { alert(WQ_TEXT.errBadFile); return; }
+
+  const when = String(obj.__ts || "").slice(0, 10) || "невідомо коли";
+  const q1 = ["Відновити копію від " + when + "?",
+    "Задач: " + taskN + " · цілей: " + goalN + (broken ? " · пропущено битих ключів: " + broken : ""),
+    "",
+    "Поточні дані буде ЗАМІНЕНО. Спершу завантажиться страхова копія поточного стану."].join("\n");
+  if (!confirm(q1)) return;
+
+  // ⚠️ Страхова копія — ФАЙЛОМ, не в localStorage: класти другу копію в те саме
+  // сховище в найгірший момент означає подвоїти зайнятий обсяг і ризикнути квотою.
+  downloadJSON("workquest_predare_" + todayKey() + ".json", getBackupData());
+
+  if (!confirm("Ви впевнені? Цю дію неможливо скасувати.")) return;
+
+  for (const k of BACKUP_KEYS) { try { localStorage.removeItem(k); } catch (e) { console.error("[restore] removeItem " + k, e); } }
+  for (const k of Object.keys(good)) lsSet(k, good[k]);
+  // Перезавантаження надійніше за ручний перелік рендерів: скидаються всі кеші.
+  location.reload();
+}
+
 /* ─── §9 · ПЕРЕВІРКИ ────────────────────────────────────────────────────── */
 // ⚠️ _prevLevel === null на першому виклику: без цього кожне завантаження
 // сторінки святкувало б поточний рівень заново.
@@ -1377,6 +1533,8 @@ function checkLevelUp() {
    панель тихо не оновлювалась, бо в одному з обробників забули рядок.      */
 const RENDER = {
   today:  renderToday,
+  mode:   renderMode,
+  backup: renderBackupBtn,
   xp:     renderXp,
   difs:   renderDifRow,
   totals: renderTotals,
@@ -1407,6 +1565,34 @@ function renderXp() {
     : fmtXpNum(info.xp) + " / " + fmtXpNum(info.next) + " XP";
   $("xp-fill").style.width = info.pct + "%";
   $("xp-league").textContent = info.league.icon + " ЛІГА · " + info.league.name.toUpperCase();
+}
+
+// Перемикач «Що зробив / Що зробити» — сегментований, як у референсі:
+// активний варіант із золотою межею й галочкою.
+function renderMode() {
+  const m = curMode();
+  $("mode-row").innerHTML = [
+    '<button class="seg-btn', (m === "done" ? ' on' : ''), '" data-mode="done">Що зробив',
+    (m === "done" ? '<span class="ck">✓</span>' : ''), '</button>',
+    '<button class="seg-btn', (m === "todo" ? ' on' : ''), '" data-mode="todo">Що зробити',
+    (m === "todo" ? '<span class="ck">✓</span>' : ''), '</button>'
+  ].join("");
+  $("ask-label").textContent = m === "todo" ? "ЩО ЗРОБИТИ?" : "ЩО ЗРОБИВ?";
+  $("add-hint").textContent = m === "todo"
+    ? "Обери складність — задача ляже в «У роботі» справа й чекатиме"
+    : "Обери складність — задачу буде записано й одразу закрито";
+  $("task-input").placeholder = m === "todo" ? "Що треба зробити…" : "Назва задачі…";
+}
+
+// Чотиристанний підпис: користувач має бачити вік копії, а не лише її наявність.
+function renderBackupBtn() {
+  const age = backupAgeDays();
+  const b = $("backup-btn");
+  b.classList.remove("warn");
+  if (age === null) { b.textContent = "💾 Зробити копію"; b.classList.add("warn"); return; }
+  if (age === 0) { b.textContent = "💾 Копія сьогодні ✓"; return; }
+  b.textContent = "💾 Копія " + age + " " + plural(age, "день", "дні", "днів") + " тому";
+  if (age > 3) { b.textContent += " ⚠"; b.classList.add("warn"); }
 }
 
 function renderToday() {
@@ -1467,17 +1653,26 @@ function renderTotals() {
 }
 
 // Один рядок агрегату — спільний для дня, тижня, місяця й року.
-function progRow(label, agg, isToday) {
+// Рядок агрегату — спільний для дня, тижня, місяця й року.
+// days — список днів, які цей рядок покриває: комірка клікабельна і відкриває
+// перелік того, що саме зроблено. Тому агрегат мусить пам'ятати свої дні.
+function progRow(label, agg, isToday, days) {
   const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
-  const h = ['<div class="prog-row', (isToday ? ' today' : ''), '">',
-             '<span class="prog-date">', esc(label), '</span><span class="prog-cells">'];
+  const dd = escAttr((days || []).join(","));
+  const h = ['<div class="prog-row', (isToday ? ' today' : ''), '" data-days="', dd,
+             '" data-label="', escAttr(label), '">',
+             '<span class="prog-date" data-pdif="*">', esc(label), '</span><span class="prog-cells">'];
   for (const d of difs) {
     const n = agg.byDif[d.id] || 0;
     if (!n) continue;
     const st = ["--c:", d.color, ";--c-t:", hexToRgba(d.color, 0.14), ";--c-b:", hexToRgba(d.color, 0.38)].join("");
-    h.push('<span class="pgc" style="', st, '" title="', escAttr(d.name), '">', esc(d.icon), ' ', n, '</span>');
+    h.push('<span class="pgc" style="', st, '" data-pdif="', escAttr(d.id), '" title="',
+           escAttr(d.name + " — показати перелік"), '">', esc(d.icon), ' ', n, '</span>');
   }
-  if (agg.goals) h.push('<span class="pgc" style="--c:#ffd166;--c-t:rgba(255,209,102,0.14);--c-b:rgba(255,209,102,0.38)">🎯 ', agg.goals, '</span>');
+  if (agg.goals) {
+    h.push('<span class="pgc" data-pdif="__goals" title="Цілі — показати перелік"',
+           ' style="--c:#ffd166;--c-t:rgba(255,209,102,0.14);--c-b:rgba(255,209,102,0.38)">🎯 ', agg.goals, '</span>');
+  }
   h.push('</span><span class="prog-xp">+', fmtXpNum(agg.xp), '</span></div>');
   return h.join("");
 }
@@ -1512,31 +1707,31 @@ function renderDays() {
     const m = new Map();
     for (const k of list) {
       const g = keyOf(k);
-      if (!m.has(g)) m.set(g, blank());
-      merge(m.get(g), s.dayMap[k]);
+      if (!m.has(g)) m.set(g, Object.assign(blank(), { days: [] }));
+      merge(m.get(g), s.dayMap[k]).days.push(k);
     }
     return m;
   };
 
   const h = [];
-  for (const k of recent) h.push(progRow(fmtDay(k), s.dayMap[k], k === today));
+  for (const k of recent) h.push(progRow(fmtDay(k), s.dayMap[k], k === today, [k]));
 
   if (inMonth.length) {
     h.push('<div class="prog-sect">ТИЖНІ · ', esc(MONTH_NAMES[+curMonth.slice(5, 7) - 1].toUpperCase()), '</div>');
     const g = group(inMonth, k => weekNum(k));
     for (const [wn, agg] of [...g.entries()].sort((a, b) => b[0] - a[0]))
-      h.push(progRow(fmtRange(keyFromNum(wn), keyFromNum(wn + 6)), agg, false));
+      h.push(progRow(fmtRange(keyFromNum(wn), keyFromNum(wn + 6)), agg, false, agg.days));
   }
   if (inYear.length) {
     h.push('<div class="prog-sect">МІСЯЦІ · ', esc(curYear), '</div>');
     const g = group(inYear, k => monthKey(k));
     for (const [mk, agg] of [...g.entries()].sort().reverse())
-      h.push(progRow(MONTH_NAMES[+mk.slice(5, 7) - 1], agg, false));
+      h.push(progRow(MONTH_NAMES[+mk.slice(5, 7) - 1], agg, false, agg.days));
   }
   if (older.length) {
     h.push('<div class="prog-sect">РОКИ</div>');
     const g = group(older, k => k.slice(0, 4));
-    for (const [y, agg] of [...g.entries()].sort().reverse()) h.push(progRow(y, agg, false));
+    for (const [y, agg] of [...g.entries()].sort().reverse()) h.push(progRow(y, agg, false, agg.days));
   }
   $("prog-list").innerHTML = h.join("");
 }
@@ -1725,18 +1920,86 @@ function renderRecChips() {
 function openRecords() { renderRecChips(); $("records-overlay").classList.remove("hidden"); }
 function closeRecords() { $("records-overlay").classList.add("hidden"); }
 
+/* ── Перелік зробленого за день/період і складність ──
+   Відповідає на «а що саме це були за задачі?» — цифра в комірці сама по собі
+   нічого не згадує через тиждень. */
+function openDayLog(days, difId, label) {
+  const set = new Set(days);
+  const isGoals = difId === "__goals";
+  const all = difId === "*";
+  const d = (isGoals || all) ? null : getDif(difId);
+
+  const rows = [];
+  if (!isGoals) {
+    for (const t of loadTasks()) {
+      if (!tDone(t) || !set.has(t.doneDay)) continue;
+      if (!all && t.difficultyId !== difId) continue;
+      rows.push({ ts: t.doneAt, day: t.doneDay, title: t.title, xp: tXp(t), id: t.id, kind: "task",
+                  dif: getDif(t.difficultyId, t.difSnap) });
+    }
+  }
+  if (isGoals || all) {
+    for (const g of loadGoals()) {
+      if (!gDone(g) || !set.has(g.doneDay)) continue;
+      rows.push({ ts: g.doneAt, day: g.doneDay, title: g.title, xp: gXp(g), id: g.id, kind: "goal" });
+    }
+  }
+  rows.sort((a, b) => b.ts - a.ts);
+
+  const sum = rows.reduce((n, r) => n + r.xp, 0);
+  $("day-title").textContent = label + (d ? " · " + d.name : (isGoals ? " · цілі" : ""));
+  $("day-sub").textContent = rows.length + " " + plural(rows.length, "запис", "записи", "записів") +
+    " · " + fmtXpNum(sum) + " XP";
+
+  const h = [];
+  if (!rows.length) h.push('<div class="empty">Тут нічого немає.</div>');
+  for (const r of rows) {
+    const c = r.kind === "goal" ? "#ffd166" : r.dif.color;
+    const ic = r.kind === "goal" ? "🎯" : r.dif.icon;
+    const tm = new Date(r.ts);
+    h.push(
+      '<div class="dlog" style="--c:', c, '" data-id="', escAttr(r.id), '" data-kind="', r.kind, '">',
+      '<span class="dlog-ic">', esc(ic), '</span>',
+      '<span class="dlog-t">', esc(r.title), '</span>',
+      '<span class="dlog-when">', esc(fmtDay(r.day)), ' ',
+      String(tm.getHours()).padStart(2, "0"), ':', String(tm.getMinutes()).padStart(2, "0"), '</span>',
+      '<span class="dlog-xp">+', fmtXpNum(r.xp), '</span>',
+      '<button class="mini" data-dlact="undo" title="Повернути в роботу">↩</button>',
+      '<button class="mini" data-dlact="del" title="Видалити">🗑</button>',
+      '</div>'
+    );
+  }
+  $("day-body").innerHTML = h.join("");
+  $("day-modal").classList.remove("hidden");
+  // Запам'ятовуємо, що саме відкрито, щоб після дії перемалювати цей самий перелік.
+  $("day-modal").dataset.days = days.join(",");
+  $("day-modal").dataset.dif = difId;
+  $("day-modal").dataset.label = label;
+}
+function closeDayLog() { $("day-modal").classList.add("hidden"); }
+function reopenDayLog() {
+  const m = $("day-modal");
+  if (m.classList.contains("hidden")) return;
+  openDayLog(String(m.dataset.days || "").split(",").filter(Boolean), m.dataset.dif, m.dataset.label);
+}
+
 function openGoalModal() { $("goal-modal").classList.remove("hidden"); $("g-title").focus(); }
 function closeGoalModal() { $("goal-modal").classList.add("hidden"); }
 
 /* ─── §13 · ОБРОБНИКИ ────────────────────────────────────────────────────── */
 // Делеговані обробники: нові рядки не потребують нових слухачів.
 
+$("mode-row").addEventListener("click", e => {
+  const b = e.target.closest("[data-mode]");
+  if (b) setMode(b.dataset.mode);
+});
+
 $("dif-row").addEventListener("click", e => {
   const b = e.target.closest("[data-dif]");
   if (!b) return;
   const input = $("task-input");
   if (!input.value.trim()) { input.focus(); return; }
-  addDone(input.value, b.dataset.dif);
+  addByMode(input.value, b.dataset.dif);
   input.value = "";
   input.focus();
 });
@@ -1747,7 +2010,7 @@ $("task-input").addEventListener("keydown", e => {
   // можна було записати не відриваючи рук від клавіатури.
   const last = lsGet(K.lastDif, "") || (activeDifs()[0] || {}).id;
   if (!last) return;
-  if (addDone(e.target.value, last)) { e.target.value = ""; }
+  if (addByMode(e.target.value, last)) { e.target.value = ""; }
 });
 
 $("goal-list").addEventListener("click", e => {
@@ -1781,12 +2044,43 @@ $("open-list").addEventListener("click", e => {
 
 $("open-panel").addEventListener("click", e => {
   if (e.target.id === "goal-add") openGoalModal();
-  if (e.target.id === "task-add") {
-    const title = prompt("Назва задачі, яку тільки плануєш:");
-    if (!title) return;
-    const d = activeDifs()[0];
-    if (d) addOpen(title, lsGet(K.lastDif, "") || d.id);
+  // «+ задача» більше не потрібна: планова задача створюється тим самим полем
+  // у режимі «Що зробити». Одна дія — один шлях.
+});
+
+$("prog-list").addEventListener("click", e => {
+  const cell = e.target.closest("[data-pdif]");
+  const row = e.target.closest("[data-days]");
+  if (!cell || !row) return;
+  const days = String(row.dataset.days || "").split(",").filter(Boolean);
+  if (!days.length) return;
+  openDayLog(days, cell.dataset.pdif, row.dataset.label);
+});
+
+$("day-modal").addEventListener("click", e => {
+  if (e.target === $("day-modal") || e.target.closest('[data-act="close"]')) { closeDayLog(); return; }
+  const box = e.target.closest("[data-id]");
+  const btn = e.target.closest("[data-dlact]");
+  if (!box || !btn) return;
+  const id = box.dataset.id;
+  if (btn.dataset.dlact === "undo") {
+    if (box.dataset.kind === "goal") reopenGoal(id); else uncompleteTask(id);
+  } else if (btn.dataset.dlact === "del") {
+    if (box.dataset.kind === "goal") deleteGoal(id); else deleteTask(id);
   }
+  reopenDayLog();
+});
+
+$("backup-btn").addEventListener("click", doBackup);
+$("import-btn").addEventListener("click", () => $("import-file").click());
+$("import-file").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";                       // щоб той самий файл можна було обрати вдруге
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => doRestore(String(r.result || ""));
+  r.onerror = () => { console.error("[restore] не вдалось прочитати файл"); alert(WQ_TEXT.errBadFile); };
+  r.readAsText(f);
 });
 
 $("g-save").addEventListener("click", () => {
@@ -1888,7 +2182,7 @@ $("records-overlay").addEventListener("click", e => {
 });
 addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
-  closeLevels(); closeRecords(); closeSettings(); closeGoalModal();
+  closeLevels(); closeRecords(); closeSettings(); closeGoalModal(); closeDayLog();
 });
 
 $("prog-btn").addEventListener("click", () => {

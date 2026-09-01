@@ -73,7 +73,7 @@ const SCRIPT = `(function () {
     // 1. Головна дія: назва + складність = задача створена й одразу закрита.
     const d = activeDifs()[0];
     document.getElementById("task-input").value = "Тестова задача";
-    document.querySelector('[data-dif="' + d.id + '"]').click();
+    document.querySelector('#dif-row [data-dif="' + d.id + '"]').click();
     ok("задачу створено", loadTasks().length, 1);
     ok("задачу одразу закрито", loadTasks()[0].doneAt > 0, true);
     ok("XP нараховано", S().xp.total, d.xp);
@@ -119,6 +119,35 @@ const SCRIPT = `(function () {
     // 7. Серія й календарні середні рахуються.
     ok("серія = 1", S().streak.current, 1);
     ok("днів активності = 1", S().days.active, 1);
+
+    // 8. Режим «Що зробити» кладе задачу у відкриті, XP не чіпає.
+    const xpBefore = S().xp.total;
+    setMode("todo");
+    ok("режим перемкнувся", curMode(), "todo");
+    document.getElementById("task-input").value = "Планова задача";
+    document.querySelector('#dif-row [data-dif="' + d.id + '"]').click();
+    ok("планова задача у відкритих", S().tasks.open, 1);
+    ok("планова задача НЕ дала XP", S().xp.total, xpBefore);
+    setMode("done");
+    ok("режим повернувся", curMode(), "done");
+
+    // 9. Перелік «що саме зроблено» за днем і складністю.
+    openDayLog([todayKey()], d.id, "сьогодні");
+    const log = document.getElementById("day-body").innerHTML;
+    ok("перелік дня непорожній", log.indexOf("dlog") >= 0, true);
+    ok("перелік знайшов задачу", log.indexOf("Тестова задача") >= 0, true);
+    closeDayLog();
+
+    // 10. Бекап: усі ключі реєстру потрапляють у копію, JSON валідний.
+    const bk = JSON.parse(getBackupData());
+    ok("копія має маркер формату", bk.__wq, 1);
+    ok("копія несе задачі", typeof bk["workquest_tasks_v1"], "string");
+    ok("BACKUP_KEYS покриває весь реєстр", BACKUP_KEYS.length, Object.keys(WQ_KEYS).length);
+    ok("копія читається назад", JSON.parse(bk["workquest_tasks_v1"]).length, loadTasks().length);
+
+    // 11. Вік копії рахується різницею ключів дат, а не мілісекунд.
+    localStorage.setItem("workquest_backup_date_v1", todayKey());
+    ok("копія сьогодні → вік 0", backupAgeDays(), 0);
 
     localStorage.clear();
   } catch (e) {

@@ -110,7 +110,10 @@ if (fs.existsSync(p("index.html"))) {
   HTML = fs.readFileSync(p("index.html"), "utf8");
 
   const block = HTML.match(/const\s+WQ_KEYS\s*=\s*\{[\s\S]*?\n\s*\};/);
-  const used = new Set([...HTML.matchAll(/["'`](workquest_[a-z0-9_]+)["'`]/gi)].map((m) => m[1]));
+  // ⚠️ Шукаємо ЛИШЕ літерали з версійним суфіксом `_vN` — це і є ключі сховища.
+  // Без цього вартовий лаявся на префікси імен файлів копії
+  // ("workquest_backup_" + дата + ".json"), які ключами не є.
+  const used = new Set([...HTML.matchAll(/["'`](workquest_[a-z0-9_]*_v\d+)["'`]/gi)].map((m) => m[1]));
   if (block) {
     const declared = new Set([...block[0].matchAll(/["'`](workquest_[a-z0-9_]+)["'`]/gi)].map((m) => m[1]));
     for (const k of used) if (!declared.has(k)) err(`ключ "${k}" використовується, але не оголошений у WQ_KEYS (не потрапить у BACKUP_KEYS)`);
