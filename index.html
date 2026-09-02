@@ -1815,6 +1815,26 @@ function editTaskTitle(id, title) {
   return true;
 }
 
+/* ── Прибрати винесену задачу назад у ціль ──
+   ⚠️ Дзеркало promoteStep(): виніс — маєш чим і повернути, інакше єдиним
+   виходом лишалось би 🗑 з питанням «видалити задачу?», що для скасування
+   винесення виглядає як загроза втратити дані.
+   Крок у цілі не чіпаємо: він лишається там, де й був, і знову отримує ↗.
+   Запис усе одно лягає в кошик — у задачі могли зʼявитись власні підзадачі
+   або змінена назва, і мовчки їх втратити не можна. */
+function unpromoteTask(id) {
+  const tasks = loadTasks();
+  const i = tasks.findIndex(x => x.id === id);
+  if (i < 0 || !tasks[i].goalId) return false;
+  const t = tasks[i];
+  toTrash("task", t);
+  tasks.splice(i, 1);
+  saveTasks(tasks);
+  commit();
+  toast("↩ прибрано з «У роботі» · запис у кошику");
+  return true;
+}
+
 function deleteTask(id) {
   const tasks = loadTasks();
   const i = tasks.findIndex(x => x.id === id);
@@ -2709,6 +2729,9 @@ function renderOpen() {
       // Підкроки звʼязаної гілки додаються в ЦІЛІ, тож тут кнопки немає:
       // інакше було б два місця, куди «додати», з різним результатом.
       (br ? '' : '<button class="mini" data-tact="addstep" title="Додати підзадачу">+ крок</button>'),
+      // Дзеркало кнопки ↗ у цілі: винесене можна повернути назад.
+      (t.goalId ? '<button class="mini" data-tact="unpromote" ' +
+        'title="Прибрати з «У роботі» — крок лишиться в цілі">↩</button>' : ''),
       '<button class="mini" data-tact="done" title="Виконано — записати XP">✓</button>',
       '<button class="mini" data-tact="edit" title="Редагувати назву">✎</button>',
       '<button class="mini dz" data-tact="del" title="Видалити задачу">🗑</button>',
@@ -3139,6 +3162,7 @@ $("open-list").addEventListener("click", e => {
   else if (act === "del") deleteTask(box.dataset.task);
   else if (act === "exp") { toggleRow(box.dataset.task); refresh("open"); }
   else if (act === "addstep") openStepDraft("task", box.dataset.task, null);
+  else if (act === "unpromote") unpromoteTask(box.dataset.task);
   else if (act === "edit") {
     _editTask = box.dataset.task;
     refresh("open");

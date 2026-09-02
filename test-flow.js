@@ -469,6 +469,33 @@ const SCRIPT = `(function () {
     ok("підкрок цілі відмічено з панелі задач", findStep(loadGoals()[0], sub1).st.done, true);
     ok("задача при цьому не закрилась", loadTasks()[0].doneAt, null);
 
+    // ↩ — дзеркало ↗: винесену задачу можна прибрати назад у ціль.
+    localStorage.clear();
+    addGoalSteps("Ціль туди-назад", [{ title: "Крок один", subs: [] }], 250);
+    const gu = loadGoals()[0], stU = gu.steps[0].id;
+    _rowOpen.add(gu.id); refresh();
+    document.querySelector('[data-step="' + stU + '"] [data-sact="tolist"]').click();
+    const tu = loadTasks()[0].id;
+    ok("кнопка ↩ є у винесеної задачі",
+       document.querySelector('[data-task="' + tu + '"] [data-tact="unpromote"]') !== null, true);
+    document.querySelector('[data-task="' + tu + '"] [data-tact="unpromote"]').click();
+    ok("задача пішла з «У роботі»", loadTasks().length, 0);
+    ok("крок лишився в цілі", loadGoals()[0].steps.length, 1);
+    ok("крок не відмічений", loadGoals()[0].steps[0].done, false);
+    ok("↗ у кроку знову доступне",
+       document.querySelector('[data-step="' + stU + '"] [data-sact="tolist"]') !== null, true);
+    ok("запис лежить у кошику", loadTrash().length, 1);
+    ok("XP не змінився", S().xp.total, 0);
+    // Повторне винесення після повернення працює.
+    document.querySelector('[data-step="' + stU + '"] [data-sact="tolist"]').click();
+    ok("крок виноситься знову", loadTasks().length, 1);
+    // У звичайної задачі ↩ немає — там «прибрати» означає видалити.
+    addOpen("Незвʼязана задача", activeDifs()[0].id);
+    const plainT = loadTasks().find(x => !x.goalId).id;
+    ok("у незвʼязаної задачі ↩ немає",
+       document.querySelector('[data-task="' + plainT + '"] [data-tact="unpromote"]'), null);
+    ok("unpromote не чіпає незвʼязану задачу", unpromoteTask(plainT), false);
+
     // Стрілка розгортання є ЛИШЕ там, де є що розгортати.
     localStorage.clear();
     addGoal("Гола числова ціль", 3, "шт", 100, 0);
