@@ -496,6 +496,38 @@ const SCRIPT = `(function () {
        document.querySelector('[data-task="' + plainT + '"] [data-tact="unpromote"]'), null);
     ok("unpromote не чіпає незвʼязану задачу", unpromoteTask(plainT), false);
 
+    // Зміна складності відкритої задачі і дублювання з суфіксом (N).
+    localStorage.clear();
+    const dA = activeDifs()[0], dB = activeDifs()[3];
+    addOpen("Перебрати ще 10 товарів", dA.id);
+    const edT = loadTasks()[0].id;
+    editTaskTitle(edT, "Перебрати ще 10 товарів", dB.id);
+    ok("складність відкритої задачі змінилась", loadTasks()[0].difficultyId, dB.id);
+    completeTask(edT);
+    ok("XP за нову складність", S().xp.total, dB.xp);
+    editTaskTitle(edT, "Перебрати ще 10 товарів", dA.id);
+    ok("у виконаної складність НЕ міняється", loadTasks()[0].difficultyId, dB.id);
+    ok("xpAwarded не рухається", S().xp.total, dB.xp);
+    uncompleteTask(edT);
+    addStep("task", edT, "Підзадача", null);
+    toggleStep("task", edT, loadTasks()[0].steps[0].id);
+    duplicateTask(edT);
+    duplicateTask(edT);
+    const titles = loadTasks().map(t => t.title).sort();
+    ok("дублікати з суфіксом", titles.join("|"),
+       "Перебрати ще 10 товарів|Перебрати ще 10 товарів (2)|Перебрати ще 10 товарів (3)");
+    const copy = loadTasks().find(t => t.title.endsWith("(3)"));
+    ok("копія відкрита", tDone(copy), false);
+    ok("копія з тією ж складністю", copy.difficultyId, dB.id);
+    ok("кроки скопійовано", copy.steps.length, 1);
+    ok("галочки в копії скинуто", copy.steps[0].done, false);
+    ok("id кроків нові", copy.steps[0].id !== loadTasks()[0].steps[0].id, true);
+    duplicateTask(copy.id);
+    ok("дубль дубля рахує від бази: (4), а не (3) (2)",
+       loadTasks().some(t => t.title === "Перебрати ще 10 товарів (4)"), true);
+    ok("у дублікаті є кнопка ⧉",
+       document.querySelector('[data-task="' + copy.id + '"] [data-tact="dup"]') !== null, true);
+
     // Стрілка розгортання є ЛИШЕ там, де є що розгортати.
     localStorage.clear();
     addGoal("Гола числова ціль", 3, "шт", 100, 0);

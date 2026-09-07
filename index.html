@@ -569,7 +569,9 @@ h1 {
 .edit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .edit-row:first-child { margin-top: 0; }
 .edit-lbl { font-size: 11px; color: var(--tx-4); }
-.task.edit { display: flex; align-items: center; gap: 6px; }
+.task.edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.task.edit .te-dif { flex: 0 0 auto; max-width: 100%; font-size: 12px; }
+select.fld option { background: #141a33; color: var(--tx); }
 .task.edit .te-title { padding: 5px 9px; font-size: 13px; }
 
 /* — кроки цілі — */
@@ -1804,14 +1806,52 @@ function uncompleteTask(id) {
   syncLinkedStep(t, false);
   commit();
 }
-function editTaskTitle(id, title) {
+// Редагування назви і (для ВІДКРИТОЇ задачі) складності.
+// ⚠️ У виконаної складність не міняється: xpAwarded і difSnap заморожені,
+// а «переставив складність — XP перерахувався» зламало б усю історію.
+function editTaskTitle(id, title, difId) {
   const tasks = loadTasks();
   const t = tasks.find(x => x.id === id);
   const v = String(title || "").trim().slice(0, 200);
   if (!t || !v) return false;
   t.title = v;
+  if (difId && !tDone(t) && loadDifs().some(d => d.id === difId && !d.archived)) t.difficultyId = difId;
   saveTasks(tasks);
   commit();
+  return true;
+}
+
+/* ── Дублювання задачі ──
+   Копія — нова ВІДКРИТА задача з тією ж складністю й копією кроків (нові id,
+   галочки скинуті). Назва дістає суфікс «(N)»: базова назва без суфікса,
+   N = найбільший наявний серед відкритих задач із тією ж базою + 1, тож
+   «(2)» → «(3)», а не «(2) (2)». Звʼязок із кроком цілі НЕ копіюється:
+   крок один, і задача при ньому теж одна. */
+function dupBase(title) { return String(title).replace(/\s*\((\d+)\)\s*$/, "").trim(); }
+function duplicateTask(id) {
+  const tasks = loadTasks();
+  const src = tasks.find(x => x.id === id);
+  if (!src) return false;
+  const base = dupBase(src.title);
+  let n = 1;
+  for (const t of tasks) {
+    if (tDone(t) || dupBase(t.title) !== base) continue;
+    const m = String(t.title).match(/\((\d+)\)\s*$/);
+    n = Math.max(n, m ? +m[1] : 1);
+  }
+  const title = (base + " (" + (n + 1) + ")").slice(0, 200);
+  const steps = (src.steps || []).map(st => ({
+    id: rid("s_"), title: st.title, done: false,
+    subs: (st.subs || []).map(sb => ({ id: rid("s_"), title: sb.title, done: false }))
+  }));
+  tasks.push({
+    id: rid("t_"), title, note: "", difficultyId: src.difficultyId, tags: [], steps,
+    goalId: null, stepId: null,
+    createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null, difSnap: null
+  });
+  saveTasks(tasks);
+  commit();
+  toast("⧉ " + title);
   return true;
 }
 
@@ -2702,6 +2742,10 @@ function renderOpen() {
       h.push(
         '<div class="task edit" style="--c:', d.color, '" data-task="', escAttr(t.id), '">',
         '<input class="fld grow te-title" value="', escAttr(t.title), '" maxlength="200">',
+        '<select class="fld te-dif" title="Складність">',
+        activeDifs().map(x => '<option value="' + escAttr(x.id) + '"' +
+          (x.id === t.difficultyId ? ' selected' : '') + '>' + esc(x.icon + " " + x.name + " +" + (x.xp | 0)) + '</option>').join(""),
+        '</select>',
         '<button class="mini" data-tact="esave" title="Зберегти (Enter)">✓</button>',
         '<button class="mini" data-tact="ecancel" title="Скасувати (Esc)">✕</button>',
         '</div>'
@@ -2733,7 +2777,8 @@ function renderOpen() {
       (t.goalId ? '<button class="mini" data-tact="unpromote" ' +
         'title="Прибрати з «У роботі» — крок лишиться в цілі">↩</button>' : ''),
       '<button class="mini" data-tact="done" title="Виконано — записати XP">✓</button>',
-      '<button class="mini" data-tact="edit" title="Редагувати назву">✎</button>',
+      '<button class="mini" data-tact="edit" title="Редагувати назву і складність">✎</button>',
+      '<button class="mini" data-tact="dup" title="Дублювати — копія з суфіксом (N)">⧉</button>',
       '<button class="mini dz" data-tact="del" title="Видалити задачу">🗑</button>',
       '</div>',
       linkHtml(t),
@@ -3163,6 +3208,7 @@ $("open-list").addEventListener("click", e => {
   else if (act === "exp") { toggleRow(box.dataset.task); refresh("open"); }
   else if (act === "addstep") openStepDraft("task", box.dataset.task, null);
   else if (act === "unpromote") unpromoteTask(box.dataset.task);
+  else if (act === "dup") duplicateTask(box.dataset.task);
   else if (act === "edit") {
     _editTask = box.dataset.task;
     refresh("open");
@@ -3170,7 +3216,8 @@ $("open-list").addEventListener("click", e => {
     if (i) { i.focus(); i.select(); }
   }
   else if (act === "esave") {
-    editTaskTitle(box.dataset.task, box.querySelector(".te-title").value);
+    const sel = box.querySelector(".te-dif");
+    editTaskTitle(box.dataset.task, box.querySelector(".te-title").value, sel ? sel.value : null);
     _editTask = null;
     refresh("open");
   }
