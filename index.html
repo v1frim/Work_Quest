@@ -2731,7 +2731,10 @@ function renderGoals() {
 }
 
 function renderOpen() {
-  const open = loadTasks().filter(t => !tDone(t)).sort((a, b) => b.createdAt - a.createdAt);
+  // Порядок — ХРОНОЛОГІЧНИЙ: старіші зверху, нове додається в кінець.
+  // «У роботі» це черга, а не стрічка новин; до того ж серія дублів має
+  // читатись як (2), (3), (4) згори вниз, а не навпаки.
+  const open = loadTasks().filter(t => !tDone(t)).sort((a, b) => a.createdAt - b.createdAt);
   $("open-h").innerHTML = 'У РОБОТІ' + (open.length ? ' · ' + open.length : '') +
     '<button class="add" id="task-add">+ задача</button>';
   if (!open.length) { $("open-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.open) + '</div>'; return; }

@@ -525,6 +525,10 @@ const SCRIPT = `(function () {
     duplicateTask(copy.id);
     ok("дубль дубля рахує від бази: (4), а не (3) (2)",
        loadTasks().some(t => t.title === "Перебрати ще 10 товарів (4)"), true);
+    // ⚠️ Дублі йдуть ВНИЗ: список «У роботі» хронологічний.
+    const shown = [...document.querySelectorAll("#open-list .task-t")].map(x => x.textContent);
+    ok("порядок у панелі — від старішого до новішого", shown.join("|"),
+       "Перебрати ще 10 товарів|Перебрати ще 10 товарів (2)|Перебрати ще 10 товарів (3)|Перебрати ще 10 товарів (4)");
     ok("у дублікаті є кнопка ⧉",
        document.querySelector('[data-task="' + copy.id + '"] [data-tact="dup"]') !== null, true);
 
