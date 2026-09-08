@@ -68,7 +68,7 @@ child.stderr.on("data", (d) => {
 child.on("error", (e) => finish(0, "⏭  перевірка циклу пропущена: " + e.message));
 
 // Сценарій виконується В СТОРІНЦІ: користуємось її ж API, як користувач.
-const SCRIPT = `(function () {
+const SCRIPT = `(async function () {
   const out = [];
   const ok = (name, got, want) => out.push({ name, got, want, pass: String(got) === String(want) });
   // ⚠️ confirm() у безголовому браузері нічого не питає й блокує сценарій
@@ -608,7 +608,69 @@ const SCRIPT = `(function () {
     deleteTask(rid2); restoreTrash(rid2); deleteTask(rid2);
     ok("у кошику один запис", loadTrash().length, 1);
 
-    // 19. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
+    // 19. Копія в один файл (File System Access API).
+    localStorage.clear();
+    addDone("Задача для копії", activeDifs()[0].id);
+    ok("API копії є в цьому браузері", hasFSA, true);
+    ok("без копії кнопка просить налаштувати",
+       document.getElementById("backup-btn").textContent.indexOf("Налаштувати") >= 0, true);
+
+    // Фейковий handle: перевіряємо ПОВНИЙ цикл запису, не чіпаючи диск.
+    let written = null, closed = false, asked = 0;
+    const fakeHandle = {
+      createWritable: async () => ({
+        write: async (t) => { written = t; },
+        close: async () => { closed = true; }
+      }),
+      queryPermission: async () => "granted",
+      requestPermission: async () => { asked++; return "granted"; }
+    };
+    await writeToHandle(fakeHandle);
+    ok("файл записано", typeof written === "string" && written.length > 0, true);
+    ok("потік закрито", closed, true);
+    const parsed = JSON.parse(written);
+    ok("копія містить журнал задач", JSON.parse(parsed.workquest_tasks_v1).length, 1);
+    ok("копія позначена форматом", parsed.__wq, 1);
+    ok("дата копії — сьогоднішня ЛОКАЛЬНА", lsGet("workquest_backup_date_v1", ""), todayKey());
+    ok("підпис кнопки оновився",
+       document.getElementById("backup-btn").textContent, "💾 Копія сьогодні ✓");
+
+    // Автокопія того самого дня не робить нічого: дата вже сьогоднішня.
+    written = null;
+    await autoBackup();
+    ok("повторна автокопія за день не пише", written, null);
+
+    // ⚠️ Вік копії рахується різницею КЛЮЧІВ ДАТ, не мілісекундами.
+    lsSet("workquest_backup_date_v1", fmtKey(new Date(Date.now() - 5 * 86400000)));
+    refresh("backup");
+    ok("старша за 3 дні копія попереджає",
+       document.getElementById("backup-btn").textContent, "💾 Копія 5д тому ⚠");
+    ok("клас попередження стоїть",
+       document.getElementById("backup-btn").classList.contains("warn"), true);
+    lsSet("workquest_backup_date_v1", fmtKey(new Date(Date.now() - 2 * 86400000)));
+    refresh("backup");
+    ok("свіжа копія без попередження",
+       document.getElementById("backup-btn").textContent, "💾 Копія 2д тому");
+
+    // Скасований діалог не має нічого ламати.
+    const realPicker = window.showSaveFilePicker;
+    window.showSaveFilePicker = async () => { throw new DOMException("abort", "AbortError"); };
+    localStorage.removeItem("workquest_backup_date_v1");
+    refresh("backup");
+    await doBackup();
+    ok("скасування діалогу нічого не зберігає", lsGet("workquest_backup_date_v1", ""), "");
+    ok("застосунок живий після скасування", S().tasks.done, 1);
+    window.showSaveFilePicker = realPicker;
+
+    // Сховище handle: кладемо й дістаємо назад.
+    await idbSet("fileHandle", { marker: "wq" });
+    const back = await idbGet("fileHandle");
+    ok("handle зберігається поза localStorage", back && back.marker, "wq");
+    ok("handle НЕ потрапив у localStorage",
+       localStorage.getItem("fileHandle"), null);
+    await idbSet("fileHandle", null);
+
+    // 20. ⚠️ Розкладка НЕ стрибає при розгортанні цілі.
     // Це саме та регресія, яку не видно в жодному числі, крім координат:
     // до фіксу висота сітки росла й вертикальне центрування зсувало все вгору.
     localStorage.clear();
@@ -669,7 +731,10 @@ function run(wsUrl) {
       await send("Page.navigate", { url: PAGE }, sessionId);
       await new Promise((r) => setTimeout(r, 2500));
 
-      const r = await send("Runtime.evaluate", { expression: SCRIPT, returnByValue: true }, sessionId);
+      // ⚠️ awaitPromise: сценарій асинхронний — у ньому є перевірки копії
+      // у файл (File System Access API), які без await пройшли б «повз».
+      const r = await send("Runtime.evaluate",
+        { expression: SCRIPT, returnByValue: true, awaitPromise: true }, sessionId);
       if (r.exceptionDetails) {
         finish(1, "❌ ЦИКЛ: сценарій упав — " +
           JSON.stringify(r.exceptionDetails).slice(0, 300));

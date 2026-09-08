@@ -2203,6 +2203,83 @@ function getBackupData() {
   return JSON.stringify(o, null, 2);
 }
 
+/* ── Копія в ОДИН обраний файл (File System Access API) ──
+   ⚠️ Кнопка щоразу клала новий workquest_backup_<дата>.json у «Завантаження»,
+   і за місяць там лежало 30 файлів, з яких актуальний — невідомо який.
+   Тепер користувач ОДИН раз вибирає файл, а кожна наступна копія перезаписує
+   саме його. Той самий підхід, що в еталоні Oxford_1000.
+
+   ⚠️ FileSystemFileHandle НЕ серіалізується в JSON, тож у localStorage його
+   покласти неможливо — тільки IndexedDB, яка зберігає структуровані обʼєкти. */
+const BACKUP_IDB = "workquest_backup";
+const BACKUP_IDB_STORE = "handles";
+// ⚠️ Обидва ключі дескриптора навмисно: сучасний Chrome читає mode, старіші
+// збірки — writable. Зайве поле специфікація велить ігнорувати.
+const RW = { mode: "readwrite", writable: true };
+
+// Обгортки над IndexedDB. Помилка НІКОЛИ не валить застосунок: копія — це
+// зручність, а не умова роботи, тож обидві резолвляться «нічим».
+function idbGet(key) {
+  return new Promise(resolve => {
+    let req;
+    try { req = indexedDB.open(BACKUP_IDB, 1); } catch (e) { resolve(null); return; }
+    req.onupgradeneeded = e => e.target.result.createObjectStore(BACKUP_IDB_STORE);
+    req.onsuccess = e => {
+      try {
+        const tx = e.target.result.transaction(BACKUP_IDB_STORE, "readonly");
+        const r = tx.objectStore(BACKUP_IDB_STORE).get(key);
+        r.onsuccess = () => resolve(r.result || null);
+        r.onerror = () => resolve(null);
+      } catch (err) { resolve(null); }
+    };
+    req.onerror = () => resolve(null);
+  });
+}
+function idbSet(key, val) {
+  return new Promise(resolve => {
+    let req;
+    try { req = indexedDB.open(BACKUP_IDB, 1); } catch (e) { resolve(); return; }
+    req.onupgradeneeded = e => e.target.result.createObjectStore(BACKUP_IDB_STORE);
+    req.onsuccess = e => {
+      try {
+        const tx = e.target.result.transaction(BACKUP_IDB_STORE, "readwrite");
+        tx.objectStore(BACKUP_IDB_STORE).put(val, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (err) { resolve(); }
+    };
+    req.onerror = () => resolve();
+  });
+}
+
+// Браузер без API (Safari, Firefox) отримує старий шлях через «Завантаження».
+const hasFSA = typeof window !== "undefined" && !!window.showSaveFilePicker;
+
+async function writeToHandle(handle) {
+  const writable = await handle.createWritable();
+  await writable.write(getBackupData());
+  await writable.close();
+  // ⚠️ todayKey(), а не toISOString(): дата копії має бути ЛОКАЛЬНОЮ, інакше
+  // о 00:30 за Києвом «сьогоднішня» копія рахувалась би вчорашньою.
+  lsSet(K.backupAt, todayKey());
+  refresh("backup");
+}
+
+/* Автокопія раз на добу. Викликається на старті; жодних діалогів — якщо
+   дозволу вже немає або файл не обрано, тихо виходить. Питати дозвіл без
+   кліку користувача браузер усе одно не дасть. */
+async function autoBackup() {
+  if (!hasFSA) return;
+  if (lsGet(K.backupAt, "") === todayKey()) return;
+  try {
+    const handle = await idbGet("fileHandle");
+    if (!handle) return;
+    if ((await handle.queryPermission(RW)) !== "granted") return;
+    await writeToHandle(handle);
+    toast("💾 Автокопія збережена");
+  } catch (e) { console.warn("[backup] автокопія не вдалась", e); }
+}
+
 function downloadJSON(name, text) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
   const a = document.createElement("a");
@@ -2214,12 +2291,38 @@ function downloadJSON(name, text) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-function doBackup() {
-  const day = todayKey();
-  downloadJSON("workquest_backup_" + day + ".json", getBackupData());
-  lsSet(K.backupAt, day);
-  refresh("backup");
-  toast("💾 Копію збережено");
+/* Клік по «Копії». Перший раз питає, куди зберегти; далі мовчки перезаписує
+   той самий файл. ⚠️ Скасований діалог — не помилка: користувач передумав,
+   і застосунок має просто нічого не зробити. */
+async function doBackup() {
+  if (!hasFSA) {
+    // Фолбек лишає дату в імені: у теці «Завантаження» файл не перезаписується,
+    // тож без дати там утворилася б купа backup(1).json, backup(2).json.
+    downloadJSON("workquest_backup_" + todayKey() + ".json", getBackupData());
+    lsSet(K.backupAt, todayKey());
+    refresh("backup");
+    toast("💾 Копію збережено");
+    return;
+  }
+  const known = await idbGet("fileHandle");
+  if (known) {
+    try {
+      if ((await known.requestPermission(RW)) === "granted") {
+        await writeToHandle(known);
+        toast("💾 Копію оновлено");
+        return;
+      }
+    } catch (e) { console.warn("[backup] дозвіл на файл не отримано", e); }
+  }
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: "workquest_backup.json",
+      types: [{ description: "JSON backup", accept: { "application/json": [".json"] } }]
+    });
+    await idbSet("fileHandle", handle);
+    await writeToHandle(handle);
+    toast("💾 Файл копії обрано — далі оновлюється сам");
+  } catch (e) { /* користувач закрив діалог — це нормальний вихід */ }
 }
 
 // Вік копії рахується РІЗНИЦЕЮ КЛЮЧІВ ДАТ, а не (Date.now() − parse(дата)):
@@ -2350,9 +2453,9 @@ function renderBackupBtn() {
   const age = backupAgeDays();
   const b = $("backup-btn");
   b.classList.remove("warn");
-  if (age === null) { b.textContent = "💾 Зробити копію"; b.classList.add("warn"); return; }
+  if (age === null) { b.textContent = hasFSA ? "💾 Налаштувати копію" : "💾 Зробити копію"; b.classList.add("warn"); return; }
   if (age === 0) { b.textContent = "💾 Копія сьогодні ✓"; return; }
-  b.textContent = "💾 Копія " + age + " " + plural(age, "день", "дні", "днів") + " тому";
+  b.textContent = "💾 Копія " + age + "д тому";
   if (age > 3) { b.textContent += " ⚠"; b.classList.add("warn"); }
 }
 
@@ -3542,6 +3645,10 @@ function init() {
     updateLayoutAlign();
     document.querySelector(".layout").classList.add("ready");
   });
+
+  // Копія раз на добу, без жодного діалогу. Свідомо не await — застосунок
+  // не має чекати на диск, щоб намалюватись.
+  autoBackup();
 }
 
 init();
