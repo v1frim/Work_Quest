@@ -532,6 +532,54 @@ const SCRIPT = `(async function () {
     ok("у дублікаті є кнопка ⧉",
        document.querySelector('[data-task="' + copy.id + '"] [data-tact="dup"]') !== null, true);
 
+    const draftBtn = (a) => document.querySelector('.step.draft [data-sact="' + a + '"]');
+    // ⚠️ Перший крок додається КЛІКОМ, а не викликом моделі. Саме тут була
+    // регресія: блок кроків не малювався, бо кроків ще немає, — і «+ крок»
+    // на порожній задачі не давав нічого.
+    localStorage.clear();
+    addOpen("Знайти ПОСТАВЩИКІВ", activeDifs()[5].id);
+    const ft = loadTasks()[0].id;
+    document.querySelector('[data-task="' + ft + '"] [data-tact="addstep"]').click();
+    let drf = document.getElementById("step-draft-input");
+    ok("поле першого кроку зʼявилось у задачі", drf !== null, true);
+    drf.value = "Обдзвонити 5 постачальників";
+    draftBtn("commit").click();
+    ok("перший крок задачі додано", loadTasks()[0].steps.length, 1);
+    ok("назва кроку збереглась", loadTasks()[0].steps[0].title, "Обдзвонити 5 постачальників");
+    ok("чернетка лишилась відкритою для наступного",
+       document.getElementById("step-draft-input") !== null, true);
+    draftBtn("cancel").click();
+    ok("стрілка зʼявилась після першого кроку",
+       document.querySelector('[data-task="' + ft + '"] [data-tact="exp"]') !== null, true);
+    // Підкрок теж кліком.
+    const st1 = loadTasks()[0].steps[0].id;
+    document.querySelector('[data-step="' + st1 + '"] [data-sact="addsub"]').click();
+    drf = document.getElementById("step-draft-input");
+    ok("поле підкроку зʼявилось", drf !== null, true);
+    drf.value = "Записати ціни";
+    draftBtn("commit").click();
+    ok("підкрок додано кліком", loadTasks()[0].steps[0].subs.length, 1);
+    draftBtn("cancel").click();
+
+    // Те саме для ЧИСЛОВОЇ цілі без кроків.
+    localStorage.clear();
+    addGoal("Заробити 100 $", 100, "$", 500, 0);
+    const fg = loadGoals()[0].id;
+    document.querySelector('[data-goal="' + fg + '"] [data-gact="addstep"]').click();
+    drf = document.getElementById("step-draft-input");
+    ok("поле першого кроку зʼявилось у цілі", drf !== null, true);
+    drf.value = "Скласти список товарів";
+    draftBtn("commit").click();
+    ok("перший крок цілі додано", loadGoals()[0].steps.length, 1);
+    ok("режим цілі не змінився кроком", loadGoals()[0].mode, "number");
+    draftBtn("cancel").click();
+    ok("стрілка зʼявилась у цілі",
+       document.querySelector('[data-goal="' + fg + '"] [data-gact="exp"]') !== null, true);
+    ok("порожня чернетка нічого не додає",
+       (document.querySelector('[data-goal="' + fg + '"] [data-gact="addstep"]').click(),
+        draftBtn("commit").click(),
+        loadGoals()[0].steps.length), 1);
+
     // Стрілка розгортання є ЛИШЕ там, де є що розгортати.
     localStorage.clear();
     addGoal("Гола числова ціль", 3, "шт", 100, 0);

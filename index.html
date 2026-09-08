@@ -2701,6 +2701,12 @@ function linkedBranchHtml(b) {
 
 // Дерево кроків малюється однаково для цілі й для задачі — розмітка спільна,
 // тож і обробник кліків потім один (bindSteps).
+// ⚠️ Рядок розгортається не лише коли кроки ВЖЕ є, а й коли в ньому відкрита
+// чернетка. Інакше «+ крок» на порожній цілі чи задачі не давав нічого: блок
+// кроків не малювався, бо кроків ще немає, а перший крок додається саме в
+// ньому. Класичний глухий кут «щоб додати перше, потрібне перше».
+function draftFor(ownerId) { return !!(_stepDraft && _stepDraft.ownerId === ownerId); }
+
 function stepsHtml(kind, o, note) {
   const dr = (_stepDraft && _stepDraft.ownerId === o.id) ? _stepDraft : null;
   const steps = o.steps || [];
@@ -2765,7 +2771,7 @@ function renderGoals() {
     const dn = gDone(g);
     const steps = g.mode === "steps";
     const hasSteps = (g.steps || []).length > 0;
-    const open = hasSteps && _rowOpen.has(g.id);
+    const open = (hasSteps || draftFor(g.id)) && _rowOpen.has(g.id);
 
     if (_editGoal === g.id) {
       // Форма редагування на місці цілі. Значення живуть в інпутах і
@@ -2862,7 +2868,7 @@ function renderOpen() {
     const br = linkedBranch(t);
     const lv = br ? br.st.subs : goalLeaves(t);
     const hasSteps = lv.length > 0;
-    const open = hasSteps && _rowOpen.has(t.id);
+    const open = (hasSteps || draftFor(t.id)) && _rowOpen.has(t.id);
     h.push(
       '<div class="task" style="--c:', d.color, '" data-task="', escAttr(t.id),
       '" data-owner="', escAttr(t.id), '">',
