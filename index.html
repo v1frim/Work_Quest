@@ -585,6 +585,8 @@ select.fld option { background: #141a33; color: var(--tx); }
   padding: 3px 2px; font-size: 13px; color: var(--tx-2);
 }
 .step.substep { padding-left: 22px; font-size: 12px; color: var(--tx-3); }
+.step.edit { gap: 6px; }
+.step.edit .se-edit { padding: 3px 8px; font-size: 12px; }
 .step.on .step-t { text-decoration: line-through; color: var(--tx-5); }
 .step .ck {
   flex: 0 0 auto; cursor: pointer; padding: 0 2px; line-height: 1;
@@ -2097,6 +2099,20 @@ function addStep(kind, ownerId, title, parentId) {
     }
   });
 }
+// Перейменування кроку чи підкроку. Стан `done` не чіпаємо: це правка
+// тексту, а не зміна прогресу.
+function editStep(kind, ownerId, stepId, title) {
+  const v = String(title || "").trim().slice(0, 200);
+  if (!v) return false;
+  let ok = false;
+  stepEdit(kind, ownerId, o => {
+    const f = findStep(o, stepId);
+    if (!f) return false;
+    f.st.title = v;
+    ok = true;
+  });
+  return ok;
+}
 function delStep(kind, ownerId, stepId) {
   stepEdit(kind, ownerId, o => {
     o.steps = o.steps.filter(st => {
@@ -2627,6 +2643,7 @@ const _rowOpen = new Set();
 // Що зараз редагується (id або null). Стан перегляду, не дані.
 let _editTask = null;
 let _editGoal = null;
+let _editStep = null;
 
 // Чернетка нового кроку: {kind, ownerId, parentId|null}. Рендериться інлайн-
 // рядком у самому дереві — браузерний prompt() тут виглядав як чужорідне вікно.
@@ -2690,11 +2707,23 @@ function linkedBranch(t) {
 function linkedBranchHtml(b) {
   const h = ['<div class="steps" data-skind="goal" data-sowner="', escAttr(b.g.id), '">',
     '<div class="steps-note">підкроки цілі · відмічаються тут і там одночасно</div>'];
-  for (const sb of b.st.subs) h.push(
-    '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
-    '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
-    '<span class="step-t">', esc(sb.title), '</span>',
-    '</div>');
+  for (const sb of b.st.subs) {
+    // Правка тут міняє ту саму ціль — вузол один, а не копія.
+    if (_editStep === sb.id) {
+      h.push('<div class="step edit substep" data-step="', escAttr(sb.id), '">',
+        '<input class="fld grow se-edit" value="', escAttr(sb.title), '" maxlength="200">',
+        '<button class="mini" data-sact="esave" title="Зберегти (Enter)">✓</button>',
+        '<button class="mini" data-sact="ecancel" title="Скасувати (Esc)">✕</button>',
+        '</div>');
+      continue;
+    }
+    h.push(
+      '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
+      '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
+      '<span class="step-t">', esc(sb.title), '</span>',
+      '<button class="mini" data-sact="edit" title="Редагувати назву">✎</button>',
+      '</div>');
+  }
   h.push('</div>');
   return h.join("");
 }
@@ -2724,27 +2753,40 @@ function stepsHtml(kind, o, note) {
   // ⚠️ Дерево несе на собі, ЧИЄ воно. Рядок задачі може показувати гілку
   // ЦІЛІ (див. linkedBranchHtml) — без цих атрибутів обробник правив би
   // не той журнал.
+  // Рядок у режимі правки. Значення живе в інпуті й збирається лише по ✓ —
+  // інакше кожна літера перемальовувала б список і забирала фокус.
+  const editRow = (st, isSub) => [
+    '<div class="step edit', (isSub ? ' substep' : ''), '" data-step="', escAttr(st.id), '">',
+    '<input class="fld grow se-edit" value="', escAttr(st.title), '" maxlength="200">',
+    '<button class="mini" data-sact="esave" title="Зберегти (Enter)">✓</button>',
+    '<button class="mini" data-sact="ecancel" title="Скасувати (Esc)">✕</button>',
+    '</div>'
+  ].join("");
   const h = ['<div class="steps" data-skind="', kind, '" data-sowner="', escAttr(o.id), '">'];
   if (note) h.push('<div class="steps-note">', esc(note), '</div>');
   if (!steps.length && !dr) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
   for (const st of steps) {
     const hasSubs = (st.subs || []).length > 0;
-    h.push(
+    if (_editStep === st.id) h.push(editRow(st, false));
+    else h.push(
       '<div class="step', (st.done ? ' on' : ''), '" data-step="', escAttr(st.id), '">',
       '<button class="ck" data-sact="toggle">', (st.done ? '☑' : '☐'), '</button>',
       '<span class="step-t">', esc(st.title), '</span>',
       (hasSubs ? '<span class="step-n">' + st.subs.filter(x => x.done).length + '/' + st.subs.length + '</span>' : ''),
       promo(st),
       '<button class="mini" data-sact="addsub" title="Додати підкрок">+</button>',
+      '<button class="mini" data-sact="edit" title="Редагувати назву">✎</button>',
       '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
       '</div>'
     );
     for (const sb of (st.subs || [])) {
+      if (_editStep === sb.id) { h.push(editRow(sb, true)); continue; }
       h.push(
         '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
         '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
         '<span class="step-t">', esc(sb.title), '</span>',
         promo(sb),
+        '<button class="mini" data-sact="edit" title="Редагувати назву">✎</button>',
         '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
         '</div>'
       );
@@ -3283,10 +3325,32 @@ function bindSteps(listId, kind) {
     else if (act === "del") delStep(k, oid, sid);
     else if (act === "addsub") openStepDraft(k, oid, sid);
     else if (act === "tolist") promoteStep(oid, sid);
+    // ⚠️ Тут ПОВНИЙ refresh(), а не зона за kind: рядок задачі може показувати
+    // гілку ЦІЛІ, і перемальовка «зони цілей» лишила б панель задач старою —
+    // поле правки просто не зʼявилось би там, де на нього щойно клікнули.
+    else if (act === "edit") {
+      _editStep = sid;
+      refresh();
+      const i = el.querySelector('[data-step="' + sid + '"] .se-edit');
+      if (i) { i.focus(); i.select(); }
+    }
+    else if (act === "esave") {
+      const i = row.querySelector(".se-edit");
+      _editStep = null;
+      if (i) editStep(k, oid, sid, i.value);   // commit() усередині сам перемалює
+      refresh();
+    }
+    else if (act === "ecancel") { _editStep = null; refresh(); }
   });
   // Enter лишає чернетку відкритою — серію кроків можна надрукувати
   // не торкаючись миші.
   el.addEventListener("keydown", e => {
+    if (e.target.classList && e.target.classList.contains("se-edit")) {
+      const row = e.target.closest("[data-step]");
+      if (e.key === "Enter") { e.preventDefault(); row.querySelector('[data-sact="esave"]').click(); }
+      else if (e.key === "Escape") { e.stopPropagation(); _editStep = null; refresh(); }
+      return;
+    }
     if (e.target.id !== "step-draft-input") return;
     if (e.key === "Enter") { e.preventDefault(); commitStepDraft(); }
     else if (e.key === "Escape") { e.stopPropagation(); closeStepDraft(); }

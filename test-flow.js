@@ -580,6 +580,61 @@ const SCRIPT = `(async function () {
         draftBtn("commit").click(),
         loadGoals()[0].steps.length), 1);
 
+    // Редагування кроків і підкроків — теж КЛІКОМ, як це робить користувач.
+    localStorage.clear();
+    addOpen("Знайти КОНТЕНТ", activeDifs()[5].id);
+    const edTask = loadTasks()[0].id;
+    addStep("task", edTask, "Знайти контент під органайзери", null);
+    const esId = loadTasks()[0].steps[0].id;
+    addStep("task", edTask, "Чорновий варіант", esId);
+    const ebId = loadTasks()[0].steps[0].subs[0].id;
+    _rowOpen.add(edTask); refresh();
+    document.querySelector('[data-step="' + esId + '"] [data-sact="edit"]').click();
+    let ei = document.querySelector('[data-step="' + esId + '"] .se-edit');
+    ok("поле правки кроку зʼявилось", ei !== null, true);
+    ok("у полі стара назва", ei.value, "Знайти контент під органайзери");
+    ei.value = "Знайти контент під органайзери MOLLE";
+    document.querySelector('[data-step="' + esId + '"] [data-sact="esave"]').click();
+    ok("крок перейменовано", loadTasks()[0].steps[0].title, "Знайти контент під органайзери MOLLE");
+    ok("галочка не зачепилась", loadTasks()[0].steps[0].done, false);
+    ok("підкрок на місці", loadTasks()[0].steps[0].subs.length, 1);
+    ok("режим правки закрито",
+       document.querySelector('[data-step="' + esId + '"] .se-edit'), null);
+
+    // Підкрок правиться так само.
+    document.querySelector('[data-step="' + ebId + '"] [data-sact="edit"]').click();
+    ei = document.querySelector('[data-step="' + ebId + '"] .se-edit');
+    ok("поле правки підкроку зʼявилось", ei !== null, true);
+    ei.value = "Чистовий варіант";
+    document.querySelector('[data-step="' + ebId + '"] [data-sact="esave"]').click();
+    ok("підкрок перейменовано", loadTasks()[0].steps[0].subs[0].title, "Чистовий варіант");
+
+    // Скасування не зберігає, порожнє значення не стирає назву.
+    document.querySelector('[data-step="' + esId + '"] [data-sact="edit"]').click();
+    document.querySelector('[data-step="' + esId + '"] .se-edit').value = "Зіпсована назва";
+    document.querySelector('[data-step="' + esId + '"] [data-sact="ecancel"]').click();
+    ok("скасування лишає стару назву",
+       loadTasks()[0].steps[0].title, "Знайти контент під органайзери MOLLE");
+    document.querySelector('[data-step="' + esId + '"] [data-sact="edit"]').click();
+    document.querySelector('[data-step="' + esId + '"] .se-edit').value = "   ";
+    document.querySelector('[data-step="' + esId + '"] [data-sact="esave"]').click();
+    ok("порожня назва не приймається",
+       loadTasks()[0].steps[0].title, "Знайти контент під органайзери MOLLE");
+
+    // ⚠️ Правка в ЦІЛІ з панелі задач міняє саме ціль (той самий вузол).
+    localStorage.clear();
+    addGoalSteps("Ціль із гілкою", [{ title: "Великий крок", subs: ["було"] }], 200);
+    const edGoal = loadGoals()[0], ebranch = edGoal.steps[0].subs[0].id;
+    promoteStep(edGoal.id, edGoal.steps[0].id);
+    const elt = loadTasks()[0].id;
+    _rowOpen.add(elt); refresh();
+    document.querySelector('[data-task="' + elt + '"] [data-step="' + ebranch + '"] [data-sact="edit"]').click();
+    document.querySelector('[data-task="' + elt + '"] [data-step="' + ebranch + '"] .se-edit').value = "стало";
+    document.querySelector('[data-task="' + elt + '"] [data-step="' + ebranch + '"] [data-sact="esave"]').click();
+    ok("правка з панелі задач змінила ЦІЛЬ",
+       findStep(loadGoals()[0], ebranch).st.title, "стало");
+    ok("своїх кроків задача так і не завела", loadTasks()[0].steps.length, 0);
+
     // Стрілка розгортання є ЛИШЕ там, де є що розгортати.
     localStorage.clear();
     addGoal("Гола числова ціль", 3, "шт", 100, 0);
