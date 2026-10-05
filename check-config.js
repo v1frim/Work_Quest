@@ -70,6 +70,12 @@ if (CFG) {
     for (let i = 1; i < LEVELS.length; i++) {
       if (typeof LEVELS[i] !== "number") { err(`LEVELS[${i}]: не число`); break; }
       if (LEVELS[i] <= LEVELS[i - 1]) { err(`LEVELS[${i}] = ${LEVELS[i]} не більший за LEVELS[${i - 1}] = ${LEVELS[i - 1]}`); break; }
+      // ⚠️ Кожен наступний рівень має даватись ДОРОЖЧЕ (рішення користувача,
+      // сесія 4): приріст порогу строго зростає. Округлення порогів легко
+      // ламає це непомітно — звідси перевірка.
+      if (i >= 2 && LEVELS[i] - LEVELS[i - 1] <= LEVELS[i - 1] - LEVELS[i - 2]) {
+        err(`рівень ${i + 1} дається не дорожче за ${i}: приріст ${LEVELS[i] - LEVELS[i - 1]} ≤ ${LEVELS[i - 1] - LEVELS[i - 2]}`); break;
+      }
     }
     notes.push(`рівнів: ${LEVELS.length} (макс ${LEVELS[LEVELS.length - 1]} XP)`);
     if (Array.isArray(LEAGUES) && LEAGUES.length && LEVELS.length % LEAGUES.length !== 0)

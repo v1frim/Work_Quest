@@ -323,8 +323,8 @@ const SCRIPT = `(async function () {
     // 15. Порядок цілей і вага за XP.
     localStorage.clear();
     addGoal("A", 1, "", 100, 0);
-    addGoal("B", 1, "", 2000, 0);
-    addGoal("C", 1, "", 50000, 0);
+    addGoal("B", 1, "", 20000, 0);
+    addGoal("C", 1, "", 200000, 0);
     const ord = () => loadGoals().slice().sort((a,b)=>(a.order|0)-(b.order|0)).map(x=>x.title).join("");
     ok("початковий порядок", ord(), "ABC");
     const ids = {};
@@ -338,8 +338,8 @@ const SCRIPT = `(async function () {
     // Вага береться за першим порогом, який ціль перевищила.
     const byTitle = t => loadGoals().find(x => x.title === t);
     ok("100 XP → дрібна", goalTier(byTitle("A")).name, "дрібна");
-    ok("2000 XP → велика", goalTier(byTitle("B")).name, "велика");
-    ok("50000 XP → легендарна", goalTier(byTitle("C")).name, "легендарна");
+    ok("20 000 XP → велика", goalTier(byTitle("B")).name, "велика");
+    ok("200 000 XP → легендарна", goalTier(byTitle("C")).name, "легендарна");
     // Колір ваги реально доїжджає в розмітку.
     ok("колір ваги в рядку", document.getElementById("goal-list").innerHTML.indexOf(goalTier(byTitle("C")).color) >= 0, true);
     ok("ручка перетягування є", document.querySelectorAll("#goal-list .grip").length, 3);
@@ -710,6 +710,168 @@ const SCRIPT = `(async function () {
     const rid2 = loadTasks()[0].id;
     deleteTask(rid2); restoreTrash(rid2); deleteTask(rid2);
     ok("у кошику один запис", loadTrash().length, 1);
+
+    // 18b. НОВА ЕКОНОМІКА (сесія 4): 1 000 XP ≈ година, рівень 100 = 1 000 000.
+    ok("рівень 100 — рівно мільйон", LEVELS[99], 1000000);
+    ok("рівень 2 — за ~30 хв роботи", getLevelInfo(500).n, 2);
+    ok("мільйон — це сотий рівень", getLevelInfo(1000000).n, 100);
+    let growing = true;
+    for (let i = 2; i < LEVELS.length; i++) if (LEVELS[i] - LEVELS[i-1] <= LEVELS[i-1] - LEVELS[i-2]) growing = false;
+    ok("кожен наступний рівень дорожчий", growing, true);
+    ok("Миттєва = 3 хв = 50 XP", getDif("d_instant").xp, 50);
+    ok("Складна = 2 год = 2000 XP", getDif("d_hard").xp, 2000);
+    ok("Монументальна = 20 год = 20000 XP", getDif("d_titan").xp, 20000);
+
+    // Задача — бюджет; кроки з власною складністю віднімаються від неї.
+    localStorage.clear();
+    const PH = getDif("d_heavy").xp, PE = getDif("d_easy").xp;
+    addOpen("Важка з кроками", "d_heavy");
+    const hv = loadTasks()[0].id;
+    addStep("task", hv, "Проста 1", null, "d_easy");
+    addStep("task", hv, "Проста 2", null, "d_easy");
+    addStep("task", hv, "Без XP", null, "");
+    const hs = loadTasks()[0].steps;
+    ok("крок памʼятає складність", hs[0].difficultyId, "d_easy");
+    ok("крок «без XP» не має складності", hs[2].difficultyId, null);
+    toggleStep("task", hv, hs[0].id);
+    ok("крок дає свій XP одразу", S().xp.total, PE);
+    ok("задача ще відкрита", tDone(loadTasks()[0]), false);
+    ok("XP кроку — у сьогоднішньому дні", S().today.xp, PE);
+    ok("крок НЕ рахується задачею дня", S().today.done, 0);
+    ok("залишок задачі зменшився", taskRemainder(loadTasks()[0]), PH - PE);
+    ok("у рядку задачі — залишок",
+       document.querySelector('[data-task="' + hv + '"] .task-x').textContent.indexOf(fmtXpNum(PH - PE)) >= 0, true);
+    toggleStep("task", hv, hs[1].id);
+    toggleStep("task", hv, hs[2].id);
+    ok("крок без XP нічого не дає", S().xp.total, 2 * PE);
+    completeTask(hv);
+    ok("задача дала лише залишок", loadTasks()[0].xpAwarded, PH - 2 * PE);
+    ok("РАЗОМ рівно ціна Важкої", S().xp.total, PH);
+
+    // Симетрія: скасували задачу й крок — повторне закриття дає новий залишок.
+    uncompleteTask(hv);
+    ok("скасування задачі лишає XP кроків", S().xp.total, 2 * PE);
+    toggleStep("task", hv, hs[1].id);
+    ok("зняття галочки кроку знімає його XP", S().xp.total, PE);
+    completeTask(hv);
+    ok("знову рівно ціна Важкої", S().xp.total, PH);
+
+    // Без кроків задача дає повну ціну.
+    localStorage.clear();
+    addOpen("Важка без кроків", "d_heavy");
+    completeTask(loadTasks()[0].id);
+    ok("без кроків — повна ціна", S().xp.total, PH);
+
+    // Крок зі складністю й підкроками: крок платить лише залишок після них.
+    localStorage.clear();
+    const PN = getDif("d_normal").xp, PI = getDif("d_instant").xp;
+    addOpen("Задача", "d_heavy");
+    const tk = loadTasks()[0].id;
+    addStep("task", tk, "Звичайний крок", null, "d_normal");
+    const stN = loadTasks()[0].steps[0].id;
+    addStep("task", tk, "миттєвий 1", stN, "d_instant");
+    addStep("task", tk, "миттєвий 2", stN, "d_instant");
+    const subA = loadTasks()[0].steps[0].subs[0].id, subB = loadTasks()[0].steps[0].subs[1].id;
+    toggleStep("task", tk, subA);
+    ok("підкрок дає свій XP", S().xp.total, PI);
+    toggleStep("task", tk, subB);
+    ok("закрита гілка = рівно ціна кроку", S().xp.total, PN);
+    ok("крок сам дав лише залишок", loadTasks()[0].steps[0].xpAwarded, PN - 2 * PI);
+    toggleStep("task", tk, subA);
+    ok("знята галочка підкроку відкриває крок і знімає його XP", S().xp.total, PI);
+    ok("крок знову відкритий", loadTasks()[0].steps[0].done, false);
+    toggleStep("task", tk, stN);
+    ok("клік по кроку закриває гілку — рівно ціна кроку", S().xp.total, PN);
+    addStep("task", tk, "новий підкрок", stN, "d_instant");
+    ok("новий підкрок відкриває крок і забирає його залишок", S().xp.total, 2 * PI);
+
+    // Кроки дорожчі за задачу: задача — 0, зроблена робота лишається.
+    localStorage.clear();
+    addOpen("Недооцінена", "d_instant");
+    const ui = loadTasks()[0].id;
+    addStep("task", ui, "Насправді проста", null, "d_easy");
+    toggleStep("task", ui, loadTasks()[0].steps[0].id);
+    completeTask(ui);
+    ok("задача не йде в мінус", loadTasks()[0].xpAwarded, 0);
+    ok("XP кроку лишився", S().xp.total, PE);
+
+    // Видалення виконаного кроку знімає його XP (після підтвердження).
+    localStorage.clear();
+    addOpen("З кроком", "d_heavy");
+    const dk = loadTasks()[0].id;
+    addStep("task", dk, "Крок", null, "d_easy");
+    toggleStep("task", dk, loadTasks()[0].steps[0].id);
+    delStep("task", dk, loadTasks()[0].steps[0].id);
+    ok("видалений крок знімає XP", S().xp.total, 0);
+
+    // Складність кроку: виконаному не міняється (XP заморожений).
+    addStep("task", dk, "Ще крок", null, "d_easy");
+    const ek = loadTasks()[0].steps[0].id;
+    editStep("task", dk, ek, "Ще крок", "d_hard");
+    ok("складність невиконаного кроку міняється", loadTasks()[0].steps[0].difficultyId, "d_hard");
+    toggleStep("task", dk, ek);
+    editStep("task", dk, ek, "Ще крок", "d_instant");
+    ok("у виконаного — ні", loadTasks()[0].steps[0].difficultyId, "d_hard");
+    ok("і XP не рухається", S().xp.total, getDif("d_hard").xp);
+
+    // Кліком: чернетка кроку має вибір складності, і він запамʼятовується.
+    localStorage.clear();
+    addOpen("Клікова", "d_heavy");
+    const ck = loadTasks()[0].id;
+    document.querySelector('[data-task="' + ck + '"] [data-tact="addstep"]').click();
+    ok("у чернетці кроку задачі є вибір складності", document.getElementById("step-draft-dif") !== null, true);
+    document.getElementById("step-draft-input").value = "Крок із XP";
+    document.getElementById("step-draft-dif").value = "d_small";
+    document.querySelector('.step.draft [data-sact="commit"]').click();
+    ok("крок отримав обрану складність", loadTasks()[0].steps[0].difficultyId, "d_small");
+    ok("вибір лишився для наступного кроку", document.getElementById("step-draft-dif").value, "d_small");
+    document.querySelector('.step.draft [data-sact="cancel"]').click();
+    ok("XP кроку видно в рядку",
+       document.querySelector('[data-step="' + loadTasks()[0].steps[0].id + '"] .step-xp').textContent,
+       "+" + fmtXpNum(getDif("d_small").xp));
+    // У цілей вибору складності кроку немає: там кроки — прогрес, не XP.
+    addGoal("Ціль", 3, "шт", 100, 0);
+    document.querySelector('[data-goal="' + loadGoals()[0].id + '"] [data-gact="addstep"]').click();
+    ok("у чернетці кроку цілі вибору складності немає", document.getElementById("step-draft-dif"), null);
+    document.querySelector('.step.draft [data-sact="cancel"]').click();
+
+    // Міграція 4 доносить нові ціни в реєстр, що вже лежить у користувача.
+    localStorage.clear();
+    const oldReg = DEFAULT_DIFFICULTIES.map(d => Object.assign({}, d, { xp: 7 }));
+    oldReg.push({ id: "d_custom", name: "Своя", icon: "★", color: "#ffffff", xp: 60, order: 99, archived: false });
+    localStorage.setItem("workquest_difficulties_v1", JSON.stringify(oldReg));
+    localStorage.setItem("workquest_meta_v1", JSON.stringify({ schema: 3 }));
+    // Історія в старій валюті: виконана Складна за 100, задача з власною
+    // складністю за 60, відкрита задача, ціль, задача в кошику.
+    const T0 = Date.now() - 86400000;
+    localStorage.setItem("workquest_tasks_v1", JSON.stringify([
+      { id: "t_old1", title: "Стара складна", difficultyId: "d_hard", steps: [], createdAt: T0, doneAt: T0, doneDay: dayKeyOf(T0), xpAwarded: 100, difSnap: { name: "Складна", color: "#ffa94d", icon: "🟠" } },
+      { id: "t_old2", title: "Своя", difficultyId: "d_custom", steps: [], createdAt: T0, doneAt: T0, doneDay: dayKeyOf(T0), xpAwarded: 60, difSnap: { name: "Своя", color: "#ffffff", icon: "★" } },
+      { id: "t_old3", title: "Відкрита", difficultyId: "d_hard", steps: [], createdAt: T0, doneAt: null, doneDay: null, xpAwarded: null, difSnap: null }
+    ]));
+    localStorage.setItem("workquest_goals_v1", JSON.stringify([
+      { id: "g_old", title: "Audi", mode: "number", target: 1, current: 0, unit: "", steps: [], xp: 20000, order: 1, createdAt: T0, doneAt: null, doneDay: null, xpAwarded: null },
+      { id: "g_done", title: "Досягнута", mode: "number", target: 1, current: 1, unit: "", steps: [], xp: 600, order: 2, createdAt: T0, doneAt: T0, doneDay: dayKeyOf(T0), xpAwarded: 600 }
+    ]));
+    localStorage.setItem("workquest_trash_v1", JSON.stringify([
+      { kind: "task", deletedAt: Date.now(), item: { id: "t_tr", title: "У кошику", difficultyId: "d_easy", steps: [], createdAt: T0, doneAt: T0, doneDay: dayKeyOf(T0), xpAwarded: 20 } }
+    ]));
+    runMigrations();
+    const mt = JSON.parse(localStorage.getItem("workquest_tasks_v1"));
+    ok("історія: стара Складна тепер за новою ціною", mt.find(t => t.id === "t_old1").xpAwarded, 2000);
+    ok("історія: власна складність — за курсом", mt.find(t => t.id === "t_old2").xpAwarded, 1000);
+    ok("відкрита задача не отримала XP", mt.find(t => t.id === "t_old3").xpAwarded, null);
+    ok("день виконання не зрушив", mt.find(t => t.id === "t_old1").doneDay, dayKeyOf(T0));
+    const mg = JSON.parse(localStorage.getItem("workquest_goals_v1"));
+    ok("ціль НЕ переоцінена (рішення власника)", mg.find(g => g.id === "g_old").xp, 20000);
+    ok("досягнута ціль теж не чіпається", mg.find(g => g.id === "g_done").xpAwarded, 600);
+    ok("задача в кошику теж у новій валюті",
+       JSON.parse(localStorage.getItem("workquest_trash_v1"))[0].item.xpAwarded, getDif("d_easy").xp);
+    const reg = JSON.parse(localStorage.getItem("workquest_difficulties_v1"));
+    ok("стандартна складність отримала нову ціну", reg.find(d => d.id === "d_hard").xp, 2000);
+    ok("власна — помножена на курс", reg.find(d => d.id === "d_custom").xp, 1000);
+    ok("схема — 4", JSON.parse(localStorage.getItem("workquest_meta_v1")).schema, 4);
+    localStorage.clear();
 
     // 19. Копія в один файл (File System Access API).
     localStorage.clear();

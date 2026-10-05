@@ -586,6 +586,10 @@ select.fld option { background: #141a33; color: var(--tx); }
 }
 .step.substep { padding-left: 22px; font-size: 12px; color: var(--tx-3); }
 .step.edit { gap: 6px; }
+.step .se-dif { flex: 0 0 auto; max-width: 150px; padding: 3px 6px; font-size: 11px; }
+.step-xp { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--c); }
+.step.on .step-xp { opacity: 0.7; }
+.task-x-of { font-weight: 400; opacity: 0.6; }
 .step.edit .se-edit { padding: 3px 8px; font-size: 12px; }
 .step.on .step-t { text-decoration: line-through; color: var(--tx-5); }
 .step .ck {
@@ -1265,6 +1269,28 @@ const tXp   = t => (typeof t.xpAwarded === "number" ? t.xpAwarded : 0);
 const gDone = g => (typeof g.doneAt === "number" && g.doneAt > 0);
 const gXp   = g => (typeof g.xpAwarded === "number" ? g.xpAwarded : 0);
 
+/* ── XP за кроки задачі (сесія 4, задум користувача) ──
+   Задача — це БЮДЖЕТ XP її складності. Крок чи підкрок із власною складністю
+   дає свій XP одразу, коли його відмічено, і ця сума ВІДНІМАЄТЬСЯ від задачі:
+   Важка з двома простими кроками разом дає ту саму ціну Важкої, а не більше.
+   Те саме на рівні кроку: крок зі складністю платить лише залишок після своїх
+   підкроків. Обхід дерева — тут, в одному місці, для S(), залишку й тестів.
+   ⚠️ Якщо кроки разом дорожчі за задачу, задача закривається з 0 XP, а кроки
+   своє лишають: XP прив'язаний до часу, тож реально зроблена робота не
+   «згорає» через те, що задачу недооцінили на старті. */
+function stepNodes(t) {
+  const out = [];
+  for (const st of (Array.isArray(t.steps) ? t.steps : [])) {
+    out.push(st);
+    for (const sb of (Array.isArray(st.subs) ? st.subs : [])) out.push(sb);
+  }
+  return out;
+}
+const sXp = n => (n && n.done && typeof n.xpAwarded === "number" ? n.xpAwarded : 0);
+function stepsXp(t) { return stepNodes(t).reduce((a, n) => a + sXp(n), 0); }
+// Скільки задача ще дасть при закритті: ціна мінус уже отримане за кроки.
+function taskRemainder(t) { return Math.max(0, (getDif(t.difficultyId).xp | 0) - stepsXp(t)); }
+
 /* ─── §4 · МІГРАЦІЇ ────────────────────────────────────────────────────────
    Реєстр складностей НАЛЕЖИТЬ КОРИСТУВАЧУ і живе в localStorage, тож правка
    DEFAULT_DIFFICULTIES сама по собі його не змінює — це навмисно. Але нові
@@ -1343,6 +1369,56 @@ const MIGRATIONS = {
       open("Підбити підсумки дня: що зробив і що далі", "d_instant")
     );
     saveTasks(tasks);
+  },
+
+  // 4 — нова економіка (сесія 4, рішення користувача): 1 000 XP ≈ година
+  // роботи, ціни складностей — часові. ⚠️ DEFAULT_DIFFICULTIES — лише сід
+  // першого запуску, а реєстр живе в localStorage користувача: без цієї
+  // міграції нові ціни НІКОЛИ б до нього не дійшли (граблі сесії 1, §6.6b).
+  // Стандартні складності беруть нову ціну; власні — множаться на середнє
+  // співвідношення нової валюти до старої.
+  //
+  // ⚠️ ЄДИНИЙ ДОЗВОЛЕНИЙ ВИНЯТОК із правила «xpAwarded заморожений»:
+  // ОДНОРАЗОВА ДЕНОМІНАЦІЯ історії задач за ЯВНОЮ згодою власника (сесія 4).
+  // Правило захищає від тихого дрейфу історії через правки реєстру; тут
+  // інше — свідомий переклад усієї історії в нову валюту, щоб «Прогрес по
+  // днях», рекорди й рівень були в одних одиницях. Кожна виконана задача
+  // отримує ціну своєї складності за новою шкалою, ніби вона діяла від
+  // першого дня. Кошик — теж: звідти задачу можуть повернути.
+  // Цілі НЕ чіпаються — власник переоцінить їх сам (його рішення).
+  4: function newEconomy() {
+    const NEW = {};
+    for (const d of DEFAULT_DIFFICULTIES) NEW[d.id] = d.xp;
+    const convert = (oldXp, difId) => {
+      if (typeof oldXp !== "number" || oldXp <= 0) return oldXp;   // нуль лишається нулем
+      return NEW[difId] != null ? NEW[difId] : Math.round(oldXp * ECON_RATE);
+    };
+
+    const stored = loadJSON(K.difs, null);
+    if (Array.isArray(stored) && stored.length) {
+      for (const d of stored) {
+        if (!d || typeof d !== "object") continue;
+        d.xp = (NEW[d.id] != null) ? NEW[d.id] : Math.round(((d.xp | 0) * ECON_RATE) / 10) * 10;
+      }
+      saveDifs(stored);
+    }
+
+    const tasks = loadTasks();
+    let n = 0;
+    for (const t of tasks) {
+      if (!t || !tDone(t)) continue;
+      t.xpAwarded = convert(t.xpAwarded, t.difficultyId); n++;
+    }
+    if (n) saveTasks(tasks);
+
+    const trash = loadJSON(K.trash, []);
+    if (Array.isArray(trash) && trash.length) {
+      for (const r of trash) {
+        if (r && r.kind === "task" && r.item && tDone(r.item))
+          r.item.xpAwarded = convert(r.item.xpAwarded, r.item.difficultyId);
+      }
+      saveJSON(K.trash, trash);
+    }
   }
 };
 
@@ -1405,6 +1481,18 @@ function sanitizeData() {
       if (!st.id) { st.id = rid("s_"); fixed++; }
       if (!Array.isArray(st.subs)) { st.subs = []; fixed++; }
       if (st.subs.length) st.done = st.subs.every(x => !!x.done);
+    }
+    // XP кроків: невиконаний вузол не тримає XP; виконаний зі складністю —
+    // має число; XP без дня не потрапив би в «Прогрес по днях».
+    for (const n of stepNodes(t)) {
+      if (n.difficultyId != null && typeof n.difficultyId !== "string") { n.difficultyId = null; fixed++; }
+      if (!n.done && (n.xpAwarded != null || n.doneDay)) {
+        n.xpAwarded = null; n.doneDay = null; n.doneAt = null; n.difSnap = null; fixed++;
+      }
+      if (n.done && n.difficultyId && typeof n.xpAwarded !== "number") { n.xpAwarded = 0; fixed++; }
+      if (n.done && sXp(n) > 0 && !n.doneDay) {
+        n.doneDay = typeof n.doneAt === "number" ? dayKeyOf(n.doneAt) : todayKey(); fixed++;
+      }
     }
   }
   if (fixed) saveTasks(tasks);
@@ -1482,13 +1570,24 @@ function computeStats() {
   const today = todayKey();
 
   const dayMap = {};                     // dayKey → {done, xp, byDif:{}, goals}
-  const dayRow = k => dayMap[k] || (dayMap[k] = { done: 0, xp: 0, byDif: {}, goals: 0 });
+  const dayRow = k => dayMap[k] || (dayMap[k] = { done: 0, xp: 0, byDif: {}, goals: 0, steps: 0 });
 
-  let done = 0, xpTotal = 0, open = 0;
+  let done = 0, xpTotal = 0, open = 0, stepsDone = 0, stepsXpTotal = 0;
   const doneByDiff = {}, xpByDiff = {}, doneByTag = {}, weekdaySum = [0,0,0,0,0,0,0];
   let early = 0, late = 0, bestTaskXp = 0;
 
   for (const t of tasks) {
+    // ⚠️ Кроки — ДО перевірки статусу задачі: крок дає XP у момент, коли його
+    // відмічено, навіть якщо сама задача ще відкрита. У лічильник задач дня
+    // кроки НЕ йдуть: задача рахується один раз, коли закрита.
+    for (const n of stepNodes(t)) {
+      const x = sXp(n);
+      if (!x) continue;
+      xpTotal += x; stepsXpTotal += x; stepsDone++;
+      if (!n.doneDay) continue;
+      const r = dayRow(n.doneDay);
+      r.xp += x; r.steps++;
+    }
     if (!tDone(t)) { open++; continue; }
     done++;
     const xp = tXp(t);
@@ -1580,6 +1679,12 @@ function computeStats() {
     if (tXp(t) > EPIC_XP_CUTOFF) continue;
     fairDays[t.doneDay] = (fairDays[t.doneDay] || 0) + tXp(t);
   }
+  // Кроки — теж робота дня, і так само без «епіків».
+  for (const t of tasks) for (const n of stepNodes(t)) {
+    const x = sXp(n);
+    if (!x || !n.doneDay || x > EPIC_XP_CUTOFF) continue;
+    fairDays[n.doneDay] = (fairDays[n.doneDay] || 0) + x;
+  }
   let bXpFair = 0, bXpFairAt = null;
   for (const k of Object.keys(fairDays)) if (fairDays[k] > bXpFair) { bXpFair = fairDays[k]; bXpFairAt = k; }
 
@@ -1622,7 +1727,7 @@ function computeStats() {
   let wdBest = -1, wdBestV = 0;
   for (let i = 0; i < 7; i++) if (weekdayAvg[i] > wdBestV) { wdBestV = weekdayAvg[i]; wdBest = i; }
 
-  const t0 = dayMap[today] || { done: 0, xp: 0, byDif: {}, goals: 0 };
+  const t0 = dayMap[today] || { done: 0, xp: 0, byDif: {}, goals: 0, steps: 0 };
   const yKey = keyFromNum(dayNum(today) - 1);
   const y0 = dayMap[yKey] || { done: 0, xp: 0 };
   const mNow = months[monthKey(today)] || { done: 0, xp: 0 };
@@ -1630,7 +1735,7 @@ function computeStats() {
 
   const lvl = getLevelInfo(xpTotal);
   const basisToday = plan.basis === "xp" ? t0.xp : t0.done;
-  const goalDay = plan.basis === "xp" ? (plan.perDay * 25) : plan.perDay;
+  const goalDay = plan.basis === "xp" ? (plan.perDay * 500) : plan.perDay;   // ~30 хв на задачу
 
   return {
     dayMap, weeks, months, dayKeys: keys,
@@ -1638,7 +1743,8 @@ function computeStats() {
     goals: { done: goalsDone, open: goalsOpen, total: goals.length },
     xp: { total: xpTotal, byDiff: xpByDiff },
     days: { active: activeDays, calendar: calDays, first, last, planMet },
-    today: { done: t0.done, xp: t0.xp, goals: t0.goals },
+    today: { done: t0.done, xp: t0.xp, goals: t0.goals, steps: t0.steps },
+    steps: { done: stepsDone, xp: stepsXpTotal },
     yesterday: { done: y0.done },
     week: { done: wNow.done, xp: wNow.xp },
     month: { done: mNow.done, xp: mNow.xp, daysPassed: +today.slice(8, 10) },
@@ -1789,12 +1895,15 @@ function completeTask(id) {
   const now = Date.now();
   t.doneAt = now;
   t.doneDay = dayKeyOf(now);
-  t.xpAwarded = d.xp | 0;
+  // ⚠️ Лише ЗАЛИШОК: те, що вже дали кроки, віднімається від ціни задачі.
+  const fromSteps = stepsXp(t);
+  t.xpAwarded = Math.max(0, (d.xp | 0) - fromSteps);
   t.difSnap = { name: d.name, color: d.color, icon: d.icon };
   saveTasks(tasks);
   syncLinkedStep(t, true);
   commit();
-  toast("+" + (d.xp | 0) + " XP · " + d.name);
+  toast("+" + fmtXpNum(t.xpAwarded) + " XP · " + d.name +
+        (fromSteps ? " (ще " + fmtXpNum(fromSteps) + " — за кроки)" : ""));
 }
 
 // ⚠️ Симетрія: знімаємо РІВНО стільки, скільки дали. Ніколи не поточний d.xp —
@@ -1843,8 +1952,9 @@ function duplicateTask(id) {
   }
   const title = (base + " (" + (n + 1) + ")").slice(0, 200);
   const steps = (src.steps || []).map(st => ({
-    id: rid("s_"), title: st.title, done: false,
-    subs: (st.subs || []).map(sb => ({ id: rid("s_"), title: sb.title, done: false }))
+    id: rid("s_"), title: st.title, done: false, difficultyId: st.difficultyId || null,
+    subs: (st.subs || []).map(sb => ({ id: rid("s_"), title: sb.title, done: false,
+                                       difficultyId: sb.difficultyId || null }))
   }));
   tasks.push({
     id: rid("t_"), title, note: "", difficultyId: src.difficultyId, tags: [], steps,
@@ -2073,35 +2183,80 @@ function stepEdit(kind, ownerId, fn) {
   commit();
   if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (o.xp | 0) + " XP", true);
 }
+/* Позначити вузол виконаним / невиконаним. Для кроку ЗАДАЧІ зі складністю
+   це ще й факт XP, заморожений так само, як у самої задачі: xpAwarded,
+   doneDay, difSnap. deduct — XP, уже отриманий за дітей вузла: вузол платить
+   лише ЗАЛИШОК. ⚠️ Уже виконаний вузол не переоцінюється — факт не
+   переписується, інакше зміна реєстру складностей пливла б в історію. */
+function markStep(n, done, withXp, deduct) {
+  if (!done) {
+    n.done = false; n.doneAt = null; n.doneDay = null; n.xpAwarded = null; n.difSnap = null;
+    return;
+  }
+  if (n.done) return;
+  const now = Date.now();
+  n.done = true; n.doneAt = now; n.doneDay = dayKeyOf(now);
+  if (withXp && n.difficultyId) {
+    const d = getDif(n.difficultyId);
+    n.xpAwarded = Math.max(0, (d.xp | 0) - (deduct | 0));
+    n.difSnap = { name: d.name, color: d.color, icon: d.icon };
+  } else { n.xpAwarded = null; n.difSnap = null; }
+}
+const subsXp = st => (st.subs || []).reduce((a, sb) => a + sXp(sb), 0);
+// Крок із підкроками виконаний тоді й лише тоді, коли виконані всі підкроки.
+function syncParentStep(st, withXp) {
+  if (!(st.subs || []).length) return;
+  const all = st.subs.every(x => x.done);
+  markStep(st, all, withXp, all ? subsXp(st) : 0);
+}
+
 function toggleStep(kind, ownerId, stepId) {
+  let gained = 0;
   stepEdit(kind, ownerId, o => {
     const f = findStep(o, stepId);
     if (!f) return false;
+    const withXp = kind === "task";        // XP за кроки — лише в задачах
+    const before = withXp ? stepsXp(o) : 0;
     const next = !f.st.done;
-    f.st.done = next;
-    // Крок із підкроками — це перемикач для всієї гілки.
-    if (!f.parent && Array.isArray(f.st.subs)) for (const sb of f.st.subs) sb.done = next;
-    // Підкрок закрив останній відкритий — закривається й батько (і навпаки).
-    if (f.parent) f.parent.done = (f.parent.subs || []).every(x => x.done);
+    if (!f.parent) {
+      // Крок із підкроками — перемикач усієї гілки. Спершу діти, потім сам
+      // крок: він платить лише залишок після них.
+      for (const sb of (f.st.subs || [])) markStep(sb, next, withXp, 0);
+      markStep(f.st, next, withXp, subsXp(f.st));
+    } else {
+      // Підкрок закрив останній відкритий — закривається й батько (і навпаки).
+      markStep(f.st, next, withXp, 0);
+      syncParentStep(f.parent, withXp);
+    }
+    gained = withXp ? stepsXp(o) - before : 0;
   });
+  if (gained > 0) toast("+" + fmtXpNum(gained) + " XP · крок");
 }
-function addStep(kind, ownerId, title, parentId) {
+// difId — складність кроку (лише для задач). Без неї крок — простий пункт
+// плану без XP, як і раніше.
+function addStep(kind, ownerId, title, parentId, difId) {
   const t = String(title || "").trim().slice(0, 200);
   if (!t) return;
+  const dif = (kind === "task" && difId && activeDifs().some(d => d.id === difId)) ? difId : null;
   stepEdit(kind, ownerId, o => {
     if (parentId) {
       const f = findStep(o, parentId);
       if (!f || f.parent) return false;   // глибше двох рівнів не пускаємо
-      f.st.subs.push({ id: rid("s_"), title: t, done: false });
-      f.st.done = f.st.subs.every(x => x.done);
+      f.st.subs.push({ id: rid("s_"), title: t, done: false, difficultyId: dif });
+      // Новий невиконаний підкрок «відкриває» батька — і забирає його XP,
+      // доки гілку не закрито знову. Інакше батько тримав би XP за роботу,
+      // яку ще не зроблено.
+      syncParentStep(f.st, kind === "task");
     } else {
-      o.steps.push({ id: rid("s_"), title: t, done: false, subs: [] });
+      o.steps.push({ id: rid("s_"), title: t, done: false, subs: [], difficultyId: dif });
     }
   });
 }
 // Перейменування кроку чи підкроку. Стан `done` не чіпаємо: це правка
 // тексту, а не зміна прогресу.
-function editStep(kind, ownerId, stepId, title) {
+// difId: undefined — складність не чіпати; "" — прибрати («без XP»).
+// ⚠️ У ВИКОНАНОГО кроку складність не міняється: його XP заморожений.
+function editStep(kind, ownerId, stepId, title, difId) {
   const v = String(title || "").trim().slice(0, 200);
   if (!v) return false;
   let ok = false;
@@ -2109,15 +2264,26 @@ function editStep(kind, ownerId, stepId, title) {
     const f = findStep(o, stepId);
     if (!f) return false;
     f.st.title = v;
+    if (kind === "task" && difId !== undefined && !f.st.done)
+      f.st.difficultyId = (difId && activeDifs().some(d => d.id === difId)) ? difId : null;
     ok = true;
   });
   return ok;
 }
 function delStep(kind, ownerId, stepId) {
+  // ⚠️ Виконаний крок із XP — це факт історії. Мовчки його не знімаємо.
+  if (kind === "task") {
+    const o = loadTasks().find(x => x.id === ownerId);
+    const f = o && findStep(o, stepId);
+    const lost = f ? sXp(f.st) + (f.parent ? 0 : subsXp(f.st)) : 0;
+    if (lost > 0 && !confirm("Видалити виконаний крок «" + f.st.title + "»? " +
+        fmtXpNum(lost) + " XP за нього буде знято.")) return;
+  }
   stepEdit(kind, ownerId, o => {
     o.steps = o.steps.filter(st => {
+      const had = (st.subs || []).length;
       st.subs = (st.subs || []).filter(sb => sb.id !== stepId);
-      if (st.subs.length) st.done = st.subs.every(x => x.done);
+      if (st.subs.length && st.subs.length !== had) syncParentStep(st, kind === "task");
       return st.id !== stepId;
     });
   });
@@ -2667,16 +2833,30 @@ function commitStepDraft() {
   const t = i.value.trim();
   if (!t) { closeStepDraft(); return; }
   const d = _stepDraft;
-  addStep(d.kind, d.ownerId, t, d.parentId);   // commit() перемалює список...
+  const sel = $("step-draft-dif");
+  // Обрана складність лишається для наступного кроку: серію однотипних
+  // кроків не доводиться щоразу перевибирати.
+  d.difId = sel ? sel.value : "";
+  addStep(d.kind, d.ownerId, t, d.parentId, d.difId);   // commit() перемалює список...
   const again = $("step-draft-input");
   if (again) again.focus();           // ...а чернетка лишиться відкритою для наступного
 }
-function draftRow(isSub) {
+// Список складностей для кроку. Перший пункт — «без XP»: крок як простий
+// пункт плану, що нічого не віднімає від задачі.
+function stepDifOptions(selected) {
+  return ['<option value="">без XP</option>'].concat(activeDifs().map(d =>
+    '<option value="' + escAttr(d.id) + '"' + (d.id === selected ? ' selected' : '') + '>' +
+    esc(d.icon + " " + d.name + " +" + fmtXpNum(d.xp)) + '</option>')).join("");
+}
+function draftRow(isSub, kind) {
   return [
     '<div class="step draft', (isSub ? ' substep' : ''), '">',
     '<span class="ck">＋</span>',
     '<input class="fld grow se-t" id="step-draft-input" placeholder="', (isSub ? 'Підкрок…' : 'Крок…'),
     '" maxlength="200">',
+    // Складність — лише в задачах: там крок віднімає свій XP від задачі.
+    (kind === "task" ? '<select class="fld se-dif" id="step-draft-dif" title="Складність кроку">' +
+      stepDifOptions(_stepDraft && _stepDraft.difId) + '</select>' : ''),
     '<button class="mini" data-sact="commit" title="Додати (Enter)">✓</button>',
     '<button class="mini" data-sact="cancel" title="Скасувати (Esc)">✕</button>',
     '</div>'
@@ -2758,10 +2938,20 @@ function stepsHtml(kind, o, note) {
   const editRow = (st, isSub) => [
     '<div class="step edit', (isSub ? ' substep' : ''), '" data-step="', escAttr(st.id), '">',
     '<input class="fld grow se-edit" value="', escAttr(st.title), '" maxlength="200">',
+    (kind === "task" && !st.done ? '<select class="fld se-dif" title="Складність кроку">' +
+      stepDifOptions(st.difficultyId) + '</select>' : ''),
     '<button class="mini" data-sact="esave" title="Зберегти (Enter)">✓</button>',
     '<button class="mini" data-sact="ecancel" title="Скасувати (Esc)">✕</button>',
     '</div>'
   ].join("");
+  // XP кроку: виконаний — скільки отримано, ще ні — скільки дасть.
+  const xpChip = (n) => {
+    if (kind !== "task" || !n.difficultyId) return '';
+    const d = n.done && n.difSnap ? n.difSnap : getDif(n.difficultyId);
+    const v = n.done ? sXp(n) : (getDif(n.difficultyId).xp | 0);
+    return '<span class="step-xp" style="--c:' + d.color + '" title="' +
+      escAttr(d.name + (n.done ? " · отримано" : " · дасть при виконанні")) + '">+' + fmtXpNum(v) + '</span>';
+  };
   const h = ['<div class="steps" data-skind="', kind, '" data-sowner="', escAttr(o.id), '">'];
   if (note) h.push('<div class="steps-note">', esc(note), '</div>');
   if (!steps.length && !dr) h.push('<div class="empty" style="padding:4px 2px">Кроків немає — додай перший.</div>');
@@ -2773,6 +2963,7 @@ function stepsHtml(kind, o, note) {
       '<button class="ck" data-sact="toggle">', (st.done ? '☑' : '☐'), '</button>',
       '<span class="step-t">', esc(st.title), '</span>',
       (hasSubs ? '<span class="step-n">' + st.subs.filter(x => x.done).length + '/' + st.subs.length + '</span>' : ''),
+      xpChip(st),
       promo(st),
       '<button class="mini" data-sact="addsub" title="Додати підкрок">+</button>',
       '<button class="mini" data-sact="edit" title="Редагувати назву">✎</button>',
@@ -2785,15 +2976,16 @@ function stepsHtml(kind, o, note) {
         '<div class="step substep', (sb.done ? ' on' : ''), '" data-step="', escAttr(sb.id), '">',
         '<button class="ck" data-sact="toggle">', (sb.done ? '☑' : '☐'), '</button>',
         '<span class="step-t">', esc(sb.title), '</span>',
+        xpChip(sb),
         promo(sb),
         '<button class="mini" data-sact="edit" title="Редагувати назву">✎</button>',
         '<button class="mini" data-sact="del" title="Видалити">🗑</button>',
         '</div>'
       );
     }
-    if (dr && dr.parentId === st.id) h.push(draftRow(true));
+    if (dr && dr.parentId === st.id) h.push(draftRow(true, kind));
   }
-  if (dr && !dr.parentId) h.push(draftRow(false));
+  if (dr && !dr.parentId) h.push(draftRow(false, kind));
   h.push('</div>');
   return h.join("");
 }
@@ -2881,6 +3073,22 @@ function renderGoals() {
   $("goal-list").innerHTML = h.join("");
 }
 
+// ⚠️ У рядку задачі — ЗАЛИШОК: скільки вона ще дасть при закритті з
+// урахуванням уже отриманого за кроки. «/ ціна» поруч — лише коли кроки
+// вже щось дали, щоб звичайна задача не обростала зайвими цифрами.
+function taskXpHtml(t, d) {
+  const got = stepsXp(t), left = taskRemainder(t);
+  const tip = got
+    ? "Ціна задачі " + fmtXpNum(d.xp) + " XP · уже отримано за кроки " + fmtXpNum(got) +
+      " · при закритті дасть ще " + fmtXpNum(left)
+    : "Ціна задачі " + fmtXpNum(d.xp) + " XP";
+  return [
+    '<span class="task-x" title="', escAttr(tip), '">+', fmtXpNum(left),
+    (got ? '<span class="task-x-of"> / ' + fmtXpNum(d.xp) + '</span>' : ''),
+    '</span>'
+  ].join("");
+}
+
 function renderOpen() {
   // Порядок — ХРОНОЛОГІЧНИЙ: старіші зверху, нове додається в кінець.
   // «У роботі» це черга, а не стрічка новин; до того ж серія дублів має
@@ -2921,7 +3129,7 @@ function renderOpen() {
         (open ? 'Згорнути підзадачі' : 'Розгорнути підзадачі') + '">' + (open ? '▾' : '▸') + '</button>' : ''),
       '<span class="task-t">', esc(t.title), '</span>',
       (hasSteps ? '<span class="step-n">' + lv.filter(x => x.done).length + '/' + lv.length + '</span>' : ''),
-      '<span class="task-x">+', d.xp | 0, '</span>',
+      taskXpHtml(t, d),
       '</div>',
       '<div class="task-ctl">',
       // Підкроки звʼязаної гілки додаються в ЦІЛІ, тож тут кнопки немає:
@@ -3336,8 +3544,9 @@ function bindSteps(listId, kind) {
     }
     else if (act === "esave") {
       const i = row.querySelector(".se-edit");
+      const sel = row.querySelector(".se-dif");
       _editStep = null;
-      if (i) editStep(k, oid, sid, i.value);   // commit() усередині сам перемалює
+      if (i) editStep(k, oid, sid, i.value, sel ? sel.value : undefined);   // commit() сам перемалює
       refresh();
     }
     else if (act === "ecancel") { _editStep = null; refresh(); }
