@@ -721,6 +721,12 @@ const SCRIPT = `(async function () {
     ok("Миттєва = 3 хв = 50 XP", getDif("d_instant").xp, 50);
     ok("Складна = 2 год = 2000 XP", getDif("d_hard").xp, 2000);
     ok("Монументальна = 20 год = 20000 XP", getDif("d_titan").xp, 20000);
+    // Кнопка складності: зверху «емодзі + назва», знизу XP і час.
+    const instBtn = document.querySelector('#dif-row [data-dif="d_instant"]');
+    ok("на кнопці видно XP", instBtn.querySelector(".meta .xp").textContent, "+50 XP");
+    ok("на кнопці видно час", instBtn.querySelector(".meta").textContent.indexOf("до 3 хв") >= 0, true);
+    ok("назва — у верхньому рядку", instBtn.querySelector(".top .n").textContent, "Миттєва");
+    ok("підказки під кнопками більше немає", document.getElementById("add-hint"), null);
 
     // Задача — бюджет; кроки з власною складністю віднімаються від неї.
     localStorage.clear();

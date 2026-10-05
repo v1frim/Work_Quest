@@ -306,10 +306,13 @@ h1 {
 
 .dif-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
 /* ⚠️ Тінт ПОВЕРХ солідної підкладки, не прозорість: інакше на світлих фазах
-   доби кнопка вимивається. Тінт і бордер рахує hexToRgba() з кольору складності. */
+   доби кнопка вимивається. Тінт і бордер рахує hexToRgba() з кольору складності.
+   Два рядки (рішення користувача, сесія 4): зверху «емодзі + назва», знизу
+   XP зліва й орієнтовний час справа — час завжди в одному стовпчику, його
+   легко пробігти очима. */
 .dif-btn {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; font-size: 14px; font-family: inherit; text-align: left;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 9px 12px; font-family: inherit; text-align: left;
   color: var(--tx-1); cursor: pointer;
   background: linear-gradient(0deg, var(--dif-t), var(--dif-t)), var(--solid-btn);
   border: 1px solid var(--dif-b); border-radius: var(--r-btn);
@@ -317,10 +320,10 @@ h1 {
 }
 .dif-btn:hover  { box-shadow: 0 0 14px var(--dif-t); }
 .dif-btn:active { transform: translateY(1px); }
-.dif-btn .n   { flex: 1 1 auto; min-width: 0; }
-.dif-btn .xp  { font-size: 12px; font-weight: 700; color: var(--dif); }
+.dif-btn .top  { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.dif-btn .meta { display: flex; width: 100%; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--tx-4); }
+.dif-btn .xp   { font-weight: 700; color: var(--dif); }
 
-.hint { font-size: 11px; color: var(--tx-6); text-align: center; margin-top: 10px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    E. FIXED-ОСТРОВИ
@@ -836,7 +839,6 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
     <p class="ask" id="ask-label">ЩО ЗРОБИВ?</p>
     <input class="field" id="task-input" type="text" placeholder="Назва задачі…" autocomplete="off">
     <div class="dif-row" id="dif-row"></div>
-    <p class="hint" id="add-hint"></p>
   </main>
 
   <!-- ПРАВА: поточні задачі (рішення сесії 1 — рекорди переїхали в оверлей) -->
@@ -2624,9 +2626,6 @@ function renderMode() {
     (m === "todo" ? '<span class="ck">✓</span>' : ''), '</button>'
   ].join("");
   $("ask-label").textContent = m === "todo" ? "ЩО ЗРОБИТИ?" : "ЩО ЗРОБИВ?";
-  $("add-hint").textContent = m === "todo"
-    ? "Обери складність — задача ляже в «У роботі» справа й чекатиме"
-    : "Обери складність — задачу буде записано й одразу закрито";
   $("task-input").placeholder = m === "todo" ? "Що треба зробити…" : "Назва задачі…";
 }
 
@@ -2677,9 +2676,9 @@ function renderDifRow() {
     h.push(
       '<button class="dif-btn" data-dif="', escAttr(d.id), '" style="', st, '" title="',
       escAttr(DIF_HINTS[d.id] || ""), '">',
-      '<span>', esc(d.icon), '</span>',
-      '<span class="n">', esc(d.name), '</span>',
-      '<span class="xp">+', d.xp | 0, '</span>',
+      '<span class="top"><span>', esc(d.icon), '</span><span class="n">', esc(d.name), '</span></span>',
+      '<span class="meta"><span class="xp">+', fmtXpNum(d.xp), ' XP</span>',
+      '<span>', esc(DIF_HINTS[d.id] || ''), '</span></span>',
       '</button>'
     );
   }
@@ -3908,7 +3907,6 @@ function init() {
   $("app-title").textContent = WQ_TEXT.appTitle;
   $("app-sub").textContent   = WQ_TEXT.appSub;
   $("ask-label").textContent = WQ_TEXT.askDone.toUpperCase();
-  $("add-hint").textContent  = WQ_TEXT.addHint;
 
   if (!LS_OK) { console.warn(WQ_TEXT.errPrivate); showBanner(WQ_TEXT.errPrivate); }
 
