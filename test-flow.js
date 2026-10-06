@@ -719,7 +719,10 @@ const SCRIPT = `(async function () {
     for (let i = 2; i < LEVELS.length; i++) if (LEVELS[i] - LEVELS[i-1] <= LEVELS[i-1] - LEVELS[i-2]) growing = false;
     ok("кожен наступний рівень дорожчий", growing, true);
     ok("Миттєва = 3 хв = 50 XP", getDif("d_instant").xp, 50);
-    ok("Складна = 2 год = 2000 XP", getDif("d_hard").xp, 2000);
+    ok("Складна = 1,5–2 год = 1750 XP", getDif("d_hard").xp, 1750);
+    ok("Важка = 5–8 год = 6500 XP", getDif("d_heavy").xp, 6500);
+    ok("Епічна = 10–15 год = 12500 XP", getDif("d_epic").xp, 12500);
+    ok("Проста — «~20 хв»", DIF_HINTS.d_easy, "~20 хв");
     ok("Монументальна = 20 год = 20000 XP", getDif("d_titan").xp, 20000);
     // Кнопка складності: зверху «емодзі + назва», знизу XP і час.
     const instBtn = document.querySelector('#dif-row [data-dif="d_instant"]');
@@ -864,7 +867,7 @@ const SCRIPT = `(async function () {
     ]));
     runMigrations();
     const mt = JSON.parse(localStorage.getItem("workquest_tasks_v1"));
-    ok("історія: стара Складна тепер за новою ціною", mt.find(t => t.id === "t_old1").xpAwarded, 2000);
+    ok("історія: стара Складна тепер за новою ціною", mt.find(t => t.id === "t_old1").xpAwarded, getDif("d_hard").xp);
     ok("історія: власна складність — за курсом", mt.find(t => t.id === "t_old2").xpAwarded, 1000);
     ok("відкрита задача не отримала XP", mt.find(t => t.id === "t_old3").xpAwarded, null);
     ok("день виконання не зрушив", mt.find(t => t.id === "t_old1").doneDay, dayKeyOf(T0));
@@ -874,9 +877,29 @@ const SCRIPT = `(async function () {
     ok("задача в кошику теж у новій валюті",
        JSON.parse(localStorage.getItem("workquest_trash_v1"))[0].item.xpAwarded, getDif("d_easy").xp);
     const reg = JSON.parse(localStorage.getItem("workquest_difficulties_v1"));
-    ok("стандартна складність отримала нову ціну", reg.find(d => d.id === "d_hard").xp, 2000);
+    ok("стандартна складність отримала нову ціну", reg.find(d => d.id === "d_hard").xp, 1750);
     ok("власна — помножена на курс", reg.find(d => d.id === "d_custom").xp, 1000);
-    ok("схема — 4", JSON.parse(localStorage.getItem("workquest_meta_v1")).schema, 4);
+    ok("схема — поточна", JSON.parse(localStorage.getItem("workquest_meta_v1")).schema, WQ_SCHEMA);
+
+    // Міграція 5 — у користувача, в якого вже відпрацювала 4-та: нові ціни
+    // трьох складностей приходять, виконані задачі лишаються як були.
+    localStorage.clear();
+    const reg4 = DEFAULT_DIFFICULTIES.map(d => Object.assign({}, d,
+      { xp: ({ d_hard: 2000, d_heavy: 5000, d_epic: 10000 })[d.id] || d.xp }));
+    localStorage.setItem("workquest_difficulties_v1", JSON.stringify(reg4));
+    localStorage.setItem("workquest_meta_v1", JSON.stringify({ schema: 4 }));
+    const T1 = Date.now() - 86400000;
+    localStorage.setItem("workquest_tasks_v1", JSON.stringify([
+      { id: "t_h4", title: "Складна за старою ціною", difficultyId: "d_hard", steps: [], createdAt: T1, doneAt: T1, doneDay: dayKeyOf(T1), xpAwarded: 2000, difSnap: { name: "Складна", color: "#ffa94d", icon: "🟠" } }
+    ]));
+    runMigrations();
+    const reg5 = JSON.parse(localStorage.getItem("workquest_difficulties_v1"));
+    ok("міграція 5: Складна — 1750", reg5.find(d => d.id === "d_hard").xp, 1750);
+    ok("міграція 5: Важка — 6500", reg5.find(d => d.id === "d_heavy").xp, 6500);
+    ok("міграція 5: Епічна — 12500", reg5.find(d => d.id === "d_epic").xp, 12500);
+    ok("міграція 5: решту не чіпає", reg5.find(d => d.id === "d_big").xp, getDif("d_big").xp);
+    ok("міграція 5: виконана задача лишила свій XP",
+       JSON.parse(localStorage.getItem("workquest_tasks_v1"))[0].xpAwarded, 2000);
     localStorage.clear();
 
     // 19. Копія в один файл (File System Access API).

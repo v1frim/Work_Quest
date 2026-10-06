@@ -12,7 +12,7 @@
 /* Версія схеми даних. Бампається, коли в MIGRATIONS додається крок.
    2 — до стандартного набору складностей додано «Монументальну».
    3 — засіяно товарні цілі й задачі користувача (прямий запит, сесія 2). */
-const WQ_SCHEMA = 4;
+const WQ_SCHEMA = 5;
 
 /* ───────────────────────────────────────────────────────────────────────────
    1. СКЛАДНОСТІ — лише СІД першого запуску.
@@ -37,19 +37,19 @@ const DEFAULT_DIFFICULTIES = [
   { id: "d_easy",    name: "Проста",   icon: "🌿", color: "#2dd4bf", xp: 330,  order: 3, archived: false },
   { id: "d_normal",  name: "Звичайна", icon: "🔵", color: "#87b4ff", xp: 500,  order: 4, archived: false },
   { id: "d_notable", name: "Помітна",  icon: "🟣", color: "#c89bff", xp: 875,  order: 5, archived: false },
-  { id: "d_hard",    name: "Складна",  icon: "🟠", color: "#ffa94d", xp: 2000, order: 6, archived: false },
+  { id: "d_hard",    name: "Складна",  icon: "🟠", color: "#ffa94d", xp: 1750, order: 6, archived: false },
   { id: "d_big",     name: "Велика",   icon: "🔴", color: "#ff6b6b", xp: 3500, order: 7, archived: false },
-  { id: "d_heavy",   name: "Важка",    icon: "⛏", color: "#d98f4b", xp: 5000, order: 8, archived: false },
-  { id: "d_epic",    name: "Епічна",   icon: "💎", color: "#ffd166", xp: 10000, order: 9, archived: false },
+  { id: "d_heavy",   name: "Важка",    icon: "⛏", color: "#d98f4b", xp: 6500, order: 8, archived: false },
+  { id: "d_epic",    name: "Епічна",   icon: "💎", color: "#ffd166", xp: 12500, order: 9, archived: false },
   { id: "d_titan",   name: "Монументальна", icon: "🏔", color: "#e05c8f", xp: 20000, order: 10, archived: false }
 ];
 
 /* Орієнтир за витраченим часом (сесія 1, запит користувача — «від суперлегких
    за 10 хв до супертяжких на тижні»). Показується підказкою в налаштуваннях. */
 const DIF_HINTS = {
-  d_instant: "до 3 хв",   d_small: "до 10 хв",   d_easy: "до 20 хв",
-  d_normal:  "~30 хв",    d_notable: "45–60 хв", d_hard: "~2 год",
-  d_big:     "3–4 год",   d_heavy: "~5 год",     d_epic: "~10 год",
+  d_instant: "до 3 хв",   d_small: "до 10 хв",   d_easy: "~20 хв",
+  d_normal:  "~30 хв",    d_notable: "45–60 хв", d_hard: "1,5–2 год",
+  d_big:     "3–4 год",   d_heavy: "5–8 год",    d_epic: "10–15 год",
   d_titan:   "20+ год"
 };
 
@@ -220,7 +220,7 @@ const METRICS = {
 
 /* Задача, дорожча за цей поріг, не враховується в best.dayXpFair.
    Як і раніше, межа лежить між «Складною» і «Великою» — у новій валюті
-   це 2 000 і 3 500 XP. */
+   це 1 750 і 3 500 XP. */
 const EPIC_XP_CUTOFF = 2500;
 
 /* Метрики, які показує оверлей рекордів і за якими вітають із побиттям. */

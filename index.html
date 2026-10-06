@@ -1421,6 +1421,23 @@ const MIGRATIONS = {
       }
       saveJSON(K.trash, trash);
     }
+  },
+
+  // 5 — уточнений час (сесія 4, прохання власника): Складна 1,5–2 год,
+  // Важка 5–8 год, Епічна 10–15 год; ціна — середина діапазону.
+  // ⚠️ Виконаних задач НЕ чіпає: нова ціна діє лише на майбутні виконання.
+  // Деномінація історії була одноразовою (міграція 4), і нова — лише з
+  // прямого «так» власника.
+  5: function retimeHardHeavyEpic() {
+    const stored = loadJSON(K.difs, null);
+    if (!Array.isArray(stored) || !stored.length) return;
+    const NEW = {};
+    for (const d of DEFAULT_DIFFICULTIES) NEW[d.id] = d.xp;
+    let n = 0;
+    for (const d of stored) {
+      if (d && (d.id === "d_hard" || d.id === "d_heavy" || d.id === "d_epic")) { d.xp = NEW[d.id]; n++; }
+    }
+    if (n) saveDifs(stored);
   }
 };
 
