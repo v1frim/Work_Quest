@@ -753,6 +753,9 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
 }
 .dlog-ic   { flex: 0 0 auto; }
 .dlog-t    { flex: 1 1 auto; min-width: 0; font-size: 14px; color: var(--tx-1); }
+.dlog.edit { flex-wrap: wrap; gap: 6px; }
+.dlog.edit .dl-title { flex: 1 1 220px; padding: 5px 9px; font-size: 13px; }
+.dlog.edit .dl-dif   { flex: 0 0 auto; font-size: 12px; }
 .dlog-when { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); }
 .dlog-xp   { flex: 0 0 auto; font-size: 12px; font-weight: 700; color: var(--c); }
 
@@ -2003,6 +2006,27 @@ function unpromoteTask(id) {
   saveTasks(tasks);
   commit();
   toast("↩ прибрано з «У роботі» · запис у кошику");
+  return true;
+}
+
+/* ── Переоцінка ВИКОНАНОЇ задачі (прохання власника, сесія 4) ──
+   ⚠️ Це не порушення правила «xpAwarded заморожений»: правило захищає від
+   ТИХОГО дрейфу історії через правки реєстру складностей. Тут — свідома
+   правка власником однієї конкретної задачі, яку він неправильно оцінив.
+   XP рахується за ПОТОЧНОЮ ціною нової складності мінус уже отримане за
+   кроки (те саме правило бюджету, що й при закритті). doneDay не рухається. */
+function regradeDoneTask(id, difId) {
+  const tasks = loadTasks();
+  const t = tasks.find(x => x.id === id);
+  if (!t || !tDone(t) || t.difficultyId === difId) return false;
+  if (!activeDifs().some(d => d.id === difId)) return false;
+  const d = getDif(difId);
+  t.difficultyId = difId;
+  t.xpAwarded = Math.max(0, (d.xp | 0) - stepsXp(t));
+  t.difSnap = { name: d.name, color: d.color, icon: d.icon };
+  saveTasks(tasks);
+  commit();
+  toast("✎ " + d.icon + " " + d.name + " · тепер +" + fmtXpNum(t.xpAwarded) + " XP");
   return true;
 }
 
@@ -3358,7 +3382,7 @@ function openDayLog(days, difId, label) {
       if (!tDone(t) || !set.has(t.doneDay)) continue;
       if (!all && t.difficultyId !== difId) continue;
       rows.push({ ts: t.doneAt, day: t.doneDay, title: t.title, xp: tXp(t), id: t.id, kind: "task",
-                  dif: getDif(t.difficultyId, t.difSnap) });
+                  difId: t.difficultyId, dif: getDif(t.difficultyId, t.difSnap) });
     }
   }
   if (isGoals || all) {
@@ -3380,6 +3404,22 @@ function openDayLog(days, difId, label) {
     const c = r.kind === "goal" ? "#ffd166" : r.dif.color;
     const ic = r.kind === "goal" ? "🎯" : r.dif.icon;
     const tm = new Date(r.ts);
+    if (r.kind === "task" && _editDone === r.id) {
+      // Правка виконаної задачі: назва + складність, ✓/✕.
+      h.push(
+        '<div class="dlog edit" style="--c:', c, '" data-id="', escAttr(r.id), '" data-kind="task">',
+        '<input class="fld grow dl-title" value="', escAttr(r.title), '" maxlength="200">',
+        '<select class="fld dl-dif" title="Нова складність">',
+        activeDifs().map(x => '<option value="' + escAttr(x.id) + '"' +
+          (x.id === r.difId ? ' selected' : '') + '>' +
+          esc(x.icon + " " + x.name + " +" + fmtXpNum(x.xp)) + '</option>').join(""),
+        '</select>',
+        '<button class="mini" data-dlact="esave" title="Зберегти й перерахувати XP">✓</button>',
+        '<button class="mini" data-dlact="ecancel" title="Скасувати">✕</button>',
+        '</div>'
+      );
+      continue;
+    }
     h.push(
       '<div class="dlog" style="--c:', c, '" data-id="', escAttr(r.id), '" data-kind="', r.kind, '">',
       '<span class="dlog-ic">', esc(ic), '</span>',
@@ -3387,6 +3427,7 @@ function openDayLog(days, difId, label) {
       '<span class="dlog-when">', esc(fmtDay(r.day)), ' ',
       String(tm.getHours()).padStart(2, "0"), ':', String(tm.getMinutes()).padStart(2, "0"), '</span>',
       '<span class="dlog-xp">+', fmtXpNum(r.xp), '</span>',
+      (r.kind === "task" ? '<button class="mini" data-dlact="edit" title="Змінити складність — XP перерахується">✎</button>' : ''),
       '<button class="mini" data-dlact="undo" title="Повернути в роботу">↩</button>',
       '<button class="mini" data-dlact="del" title="Видалити">🗑</button>',
       '</div>'
@@ -3399,7 +3440,9 @@ function openDayLog(days, difId, label) {
   $("day-modal").dataset.dif = difId;
   $("day-modal").dataset.label = label;
 }
-function closeDayLog() { $("day-modal").classList.add("hidden"); }
+function closeDayLog() { _editDone = null; $("day-modal").classList.add("hidden"); }
+// Яка виконана задача зараз у режимі правки складності (стан перегляду).
+let _editDone = null;
 function reopenDayLog() {
   const m = $("day-modal");
   if (m.classList.contains("hidden")) return;
@@ -3647,13 +3690,28 @@ $("prog-list").addEventListener("click", e => {
   openDayLog(days, cell.dataset.pdif, row.dataset.label);
 });
 
+$("day-modal").addEventListener("keydown", e => {
+  const box = e.target.closest(".dlog.edit");
+  if (!box) return;
+  if (e.key === "Enter") { e.preventDefault(); box.querySelector('[data-dlact="esave"]').click(); }
+  else if (e.key === "Escape") { e.stopPropagation(); _editDone = null; reopenDayLog(); }
+});
 $("day-modal").addEventListener("click", e => {
   if (e.target === $("day-modal") || e.target.closest('[data-act="close"]')) { closeDayLog(); return; }
   const box = e.target.closest("[data-id]");
   const btn = e.target.closest("[data-dlact]");
   if (!box || !btn) return;
   const id = box.dataset.id;
-  if (btn.dataset.dlact === "undo") {
+  if (btn.dataset.dlact === "edit") { _editDone = id; }
+  else if (btn.dataset.dlact === "ecancel") { _editDone = null; }
+  else if (btn.dataset.dlact === "esave") {
+    const sel = box.querySelector(".dl-dif");
+    const ti = box.querySelector(".dl-title");
+    _editDone = null;
+    if (ti) editTaskTitle(id, ti.value);          // назва — без змін XP
+    if (sel) regradeDoneTask(id, sel.value);      // складність — з перерахунком
+  }
+  else if (btn.dataset.dlact === "undo") {
     if (box.dataset.kind === "goal") reopenGoal(id); else uncompleteTask(id);
   } else if (btn.dataset.dlact === "del") {
     if (box.dataset.kind === "goal") deleteGoal(id); else deleteTask(id);

@@ -902,6 +902,38 @@ const SCRIPT = `(async function () {
        JSON.parse(localStorage.getItem("workquest_tasks_v1"))[0].xpAwarded, 2000);
     localStorage.clear();
 
+    // Переоцінка ВИКОНАНОЇ задачі з «Прогресу по днях»: назва й складність,
+    // XP перераховується за поточною ціною (мінус кроки), день не рухається.
+    localStorage.clear();
+    addDone("Прикинути зйомку", "d_notable");
+    const rg = loadTasks()[0], rgDay = rg.doneDay;
+    openDayLog([rgDay], "*", "Сьогодні");
+    document.querySelector('#day-modal [data-id="' + rg.id + '"] [data-dlact="edit"]').click();
+    ok("форма правки виконаної задачі відкрилась", document.querySelector("#day-modal .dl-dif") !== null, true);
+    document.querySelector("#day-modal .dl-title").value = "Прикинути Діанину зйомку";
+    document.querySelector("#day-modal .dl-dif").value = "d_hard";
+    document.querySelector('#day-modal [data-dlact="esave"]').click();
+    const rg2 = loadTasks()[0];
+    ok("назву виправлено", rg2.title, "Прикинути Діанину зйомку");
+    ok("складність виправлено", rg2.difficultyId, "d_hard");
+    ok("XP перераховано", rg2.xpAwarded, getDif("d_hard").xp);
+    ok("знімок складності оновлено", rg2.difSnap.name, getDif("d_hard").name);
+    ok("день не зрушив", rg2.doneDay, rgDay);
+    ok("задача лишилась виконаною", tDone(rg2), true);
+    ok("загальний XP — нова ціна", S().xp.total, getDif("d_hard").xp);
+    ok("форма закрилась", document.querySelector("#day-modal .dl-dif"), null);
+    closeDayLog();
+    // Кроки враховуються: переоцінка дає залишок, а не повну ціну.
+    localStorage.clear();
+    addOpen("З кроком", "d_easy");
+    const rk = loadTasks()[0].id;
+    addStep("task", rk, "крок", null, "d_small");
+    toggleStep("task", rk, loadTasks()[0].steps[0].id);
+    completeTask(rk);
+    regradeDoneTask(rk, "d_heavy");
+    ok("переоцінка віднімає XP кроків", loadTasks()[0].xpAwarded, getDif("d_heavy").xp - getDif("d_small").xp);
+    ok("разом — рівно нова ціна", S().xp.total, getDif("d_heavy").xp);
+
     // 19. Копія в один файл (File System Access API).
     localStorage.clear();
     addDone("Задача для копії", activeDifs()[0].id);
