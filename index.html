@@ -346,17 +346,18 @@ h1 {
    кліки лівої панелі. */
 #thermo {
   position: fixed; left: var(--fix-inset); top: 50%; transform: translateY(-50%); z-index: 150;
-  width: 134px; box-sizing: border-box;
+  width: 96px; box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 14px 10px 12px; user-select: none; pointer-events: none;
+  padding: 12px 8px 10px; user-select: none; pointer-events: none;
   background: var(--surface-fixed); border: var(--bd-fixed);
   border-radius: 18px; box-shadow: var(--sh-fixed);
 }
 #thermo svg  { display: block; }
 .th-cap  { font-size: 11px; font-weight: 700; letter-spacing: .14em; color: var(--tx-3); }
 .th-pts  { font-size: 15px; font-weight: 800; }
-.th-foot { font-size: 12px; color: var(--tx-3); }
-.th-foot b { font-size: 14px; color: var(--tx-1); }
+.th-foot { font-size: 11px; line-height: 1.3; color: var(--tx-3); text-align: center; }
+.th-foot b { font-size: 13px; color: var(--tx-1); }
+.th-xp   { font-size: 12px; font-weight: 700; color: var(--tx-1); margin-top: 2px; }
 /* На вужчих екранах шкала стискається, щоб не налазити на ліву панель. */
 @media (max-width: 1750px) {
   #thermo { transform: translateY(-50%) scale(.7); transform-origin: left center; }
@@ -2717,7 +2718,8 @@ function renderThermo() { $("thermo").innerHTML = planScaleHtml(S().today.xp); }
 function planZone(p) { return PLAN_ZONES.find(z => p >= z.from && p <= z.to) || PLAN_ZONES[PLAN_ZONES.length - 1]; }
 function planScaleHtml(dayXp) {
   const pts = Math.min(PLAN_MAX, Math.floor(Math.max(0, dayXp) / PLAN_XP_PER_POINT));
-  const H = 340, bottom = 284, tubeX = 66, tubeW = 10, cx = tubeX + tubeW / 2;
+  // Ширина — впритул до вмісту: поділки з цифрами зліва, кружок під трубкою.
+  const W = 74, H = 340, bottom = 284, tubeX = 46, tubeW = 10, cx = tubeX + tubeW / 2;
   // Позиції поділок: відстань між ними зменшується догори (gap зони).
   const ys = [bottom];
   for (let p = 1; p <= PLAN_TOP; p++) ys[p] = ys[p - 1] - planZone(p).gap;
@@ -2725,7 +2727,7 @@ function planScaleHtml(dayXp) {
   const zMax = PLAN_ZONES.find(z => z.to === PLAN_MAX);
   const stop = p => ((bottom - ys[p]) / (bottom - ys[PLAN_MAX])).toFixed(3);
   const h = [
-    '<svg width="114" height="', H, '" viewBox="0 0 114 ', H, '">',
+    '<svg width="', W, '" height="', H, '" viewBox="0 0 ', W, ' ', H, '">',
     '<defs><linearGradient id="th-grad" x1="0" y1="', bottom, '" x2="0" y2="', ys[PLAN_MAX], '" gradientUnits="userSpaceOnUse">',
     '<stop offset="0" stop-color="', PLAN_ZONES[0].col, '"/>',
     '<stop offset="', stop(PLAN_ZONES[0].to), '" stop-color="', PLAN_ZONES[0].col, '"/>',
@@ -2766,7 +2768,9 @@ function planScaleHtml(dayXp) {
     : pts >= PLAN_MAX ? ['<b style="color:', zMax.col, '">МАКС</b>'].join("")
     : pts > PLAN_POINTS ? ['понад план <b style="color:', z.col, '">+', pts - PLAN_POINTS, '</b>'].join("")
     : ['<b style="color:', PLAN_ZONES[0].col, '">план ✓</b>'].join("");
-  return ['<div class="th-cap">ПЛАНИ</div>', h.join(""), '<div class="th-foot">', foot, '</div>'].join("");
+  // XP дня під підписом — як на макетах: видно, скільки бракує до наступного пункту.
+  return ['<div class="th-cap">ПЛАНИ</div>', h.join(""), '<div class="th-foot">', foot, '</div>',
+          '<div class="th-xp">', fmtXpNum(Math.max(0, dayXp)), ' XP</div>'].join("");
 }
 
 function renderToday() {

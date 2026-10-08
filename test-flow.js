@@ -977,6 +977,7 @@ const SCRIPT = `(async function () {
     ok("порожній день — до плану 6", thHas("до плану 6"), true);
     addDone("Звичайна", "d_normal"); addDone("Складна", "d_hard");     // 500 + 1750 = 2250
     ok("2250 XP = 4 пункти", thPts(), "4");
+    ok("XP дня під шкалою", document.querySelector("#thermo .th-xp").textContent, fmtXpNum(2250) + " XP");
     ok("до плану — 2", thHas("до плану 2"), true);
     addDone("Помітна", "d_notable");                                    // 3125
     ok("план виконано", thHas("план ✓"), true);
