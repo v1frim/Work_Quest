@@ -965,6 +965,29 @@ const SCRIPT = `(async function () {
     ok("старим задачам порядок роздано за часом", shownT(), "Раніша|Пізніша");
     ok("order збережено", loadTasks().every(t => typeof t.order === "number"), true);
 
+    // Шкала «ПЛАНИ»: 1 пункт = 500 XP дня, план 6, максимум 16.
+    // (без регулярок: у шаблонному рядку сценарію бекслеші губляться)
+    const thHas = (...parts) => {
+      const t = document.getElementById("thermo").textContent.replace(/\s+/g, " ");
+      return parts.every(x => t.indexOf(x) >= 0);
+    };
+    const thPts = () => document.querySelector("#thermo .th-pts").textContent;
+    localStorage.clear(); refresh();
+    ok("порожній день — 0 п.", thPts(), "0 п.");
+    ok("порожній день — до плану 6", thHas("до плану 6"), true);
+    addDone("Звичайна", "d_normal"); addDone("Складна", "d_hard");     // 500 + 1750 = 2250
+    ok("2250 XP = 4 пункти", thPts(), "4 п.");
+    ok("до плану — 2", thHas("до плану 2"), true);
+    addDone("Помітна", "d_notable");                                    // 3125
+    ok("план виконано", thHas("план ✓"), true);
+    addDone("Складна 2", "d_hard");                                     // 4875 → 9 п.
+    ok("9 пунктів", thPts(), "9 п.");
+    ok("понад план +3", thHas("понад план +3"), true);
+    ok("кулька — колір зони 9–12", document.querySelector("#thermo circle").getAttribute("fill"), "#ff7a3a");
+    addDone("Велика", "d_big"); addDone("Велика 2", "d_big");           // 11875 → обрізано до 16
+    ok("стеля — 16 п.", thPts(), "16 п.");
+    ok("понад 16 — МАКС", thHas("МАКС"), true);
+
     // 19. Копія в один файл (File System Access API).
     localStorage.clear();
     addDone("Задача для копії", activeDifs()[0].id);
