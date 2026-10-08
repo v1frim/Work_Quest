@@ -934,6 +934,37 @@ const SCRIPT = `(async function () {
     ok("переоцінка віднімає XP кроків", loadTasks()[0].xpAwarded, getDif("d_heavy").xp - getDif("d_small").xp);
     ok("разом — рівно нова ціна", S().xp.total, getDif("d_heavy").xp);
 
+    // Ручний порядок «У роботі»: перетягування за ⠿, як у цілей.
+    localStorage.clear();
+    addOpen("Перша", "d_easy"); addOpen("Друга", "d_easy"); addOpen("Третя", "d_easy");
+    const ordIds = loadTasks().map(t => t.id);
+    const shownT = () => [...document.querySelectorAll("#open-list .task-t")].map(x => x.textContent).join("|");
+    ok("нові задачі — у кінець", shownT(), "Перша|Друга|Третя");
+    ok("ручка є в рядку задачі", document.querySelectorAll("#open-list .grip").length, 3);
+    reorderTasks(ordIds[2], ordIds[0]);
+    ok("Третю перенесено нагору", shownT(), "Третя|Перша|Друга");
+    // Справжнє перетягування мишею (події браузера).
+    const fromBox = document.querySelector('[data-task="' + ordIds[1] + '"]');
+    const toBox = document.querySelector('[data-task="' + ordIds[2] + '"]');
+    fromBox.querySelector(".grip").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    ok("draggable вмикається лише від ручки", fromBox.getAttribute("draggable"), "true");
+    const dt = new DataTransfer();
+    fromBox.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+    toBox.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt }));
+    toBox.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+    ok("перетягнута стає на місце цільової", shownT(), "Друга|Третя|Перша");
+    duplicateTask(ordIds[2]);
+    ok("дубль — у кінець, порядок решти не збито", shownT(), "Друга|Третя|Перша|Третя (2)");
+    // Задачі, створені до появи порядку, отримують його за часом створення.
+    localStorage.clear();
+    localStorage.setItem("workquest_tasks_v1", JSON.stringify([
+      { id: "t_b", title: "Пізніша", difficultyId: "d_easy", steps: [], createdAt: 2000, doneAt: null },
+      { id: "t_a", title: "Раніша", difficultyId: "d_easy", steps: [], createdAt: 1000, doneAt: null }
+    ]));
+    sanitizeData(); refresh();
+    ok("старим задачам порядок роздано за часом", shownT(), "Раніша|Пізніша");
+    ok("order збережено", loadTasks().every(t => typeof t.order === "number"), true);
+
     // 19. Копія в один файл (File System Access API).
     localStorage.clear();
     addDone("Задача для копії", activeDifs()[0].id);

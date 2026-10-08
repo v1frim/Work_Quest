@@ -531,14 +531,14 @@ h1 {
 .goal .goal-xp { color: var(--gc, var(--gold)); }
 .goal.done { border-left-color: var(--st-done); opacity: 0.6; }
 .goal.done .goal-xp { color: var(--st-done); }
-.goal.dragging { opacity: 0.4; }
-.goal.over { box-shadow: 0 -3px 0 0 var(--gold); }
+.goal.dragging, .task.dragging { opacity: 0.4; }
+.goal.over, .task.over { box-shadow: 0 -3px 0 0 var(--gold); }
 .grip {
   flex: 0 0 auto; cursor: grab; user-select: none;
   color: var(--tx-6); font-size: 13px; line-height: 1; padding: 0 2px;
 }
 .grip:active { cursor: grabbing; }
-.goal:hover .grip { color: var(--tx-3); }
+.goal:hover .grip, .task:hover .grip { color: var(--tx-3); }
 .goal-top { display: flex; align-items: center; gap: 8px; }
 .goal-t   { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 700; color: var(--tx-1); }
 .goal.done .goal-t { text-decoration: line-through; }
@@ -1517,6 +1517,13 @@ function sanitizeData() {
       }
     }
   }
+  // Ручний порядок «У роботі» (сесія 4): задачам, створеним до нього, роздаємо
+  // order за часом створення — після вже наявних. Ідемпотентно.
+  // ⚠️ Number(), не `| 0`: createdAt — мітка часу, у 32 біти не влазить.
+  let maxOrd = tasks.reduce((n, t) => (typeof t.order === "number" ? Math.max(n, t.order) : n), 0);
+  tasks.filter(t => typeof t.order !== "number")
+    .sort((a, b) => Number(a.createdAt) - Number(b.createdAt))
+    .forEach(t => { t.order = ++maxOrd; fixed++; });
   if (fixed) saveTasks(tasks);
 
   let gf = 0;
@@ -1829,7 +1836,7 @@ function addDone(title, difId) {
   const now = Date.now();
   const tasks = loadTasks();
   tasks.push({
-    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [], steps: [],
+    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [], steps: [], order: nextTaskOrder(),
     createdAt: now,
     doneAt: now,
     // ⚠️ Межа доби вирішується ОДИН раз, у момент події. Обчислення на льоту
@@ -1852,7 +1859,7 @@ function addOpen(title, difId, link) {
   if (!t) return false;
   const tasks = loadTasks();
   tasks.push({
-    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [], steps: [],
+    id: rid("t_"), title: t, note: "", difficultyId: difId, tags: [], steps: [], order: nextTaskOrder(),
     // Звʼязок із кроком цілі. null у звичайної задачі — поле є завжди,
     // щоб не плодити перевірок «а раптом властивості немає».
     goalId: (link && link.goalId) || null,
@@ -1979,7 +1986,7 @@ function duplicateTask(id) {
                                        difficultyId: sb.difficultyId || null }))
   }));
   tasks.push({
-    id: rid("t_"), title, note: "", difficultyId: src.difficultyId, tags: [], steps,
+    id: rid("t_"), title, note: "", difficultyId: src.difficultyId, tags: [], steps, order: nextTaskOrder(),
     goalId: null, stepId: null,
     createdAt: Date.now(), doneAt: null, doneDay: null, xpAwarded: null, difSnap: null
   });
@@ -2136,6 +2143,27 @@ function normSteps(list) {
     out.push({ id: rid("s_"), title, done: false, subs });
   }
   return out;
+}
+
+function nextTaskOrder() {
+  return loadTasks().reduce((n, t) => (typeof t.order === "number" ? Math.max(n, t.order) : n), 0) + 1;
+}
+// Перенесення відкритої задачі: from стає на місце to. Нумерація — лише серед
+// відкритих: виконані в панелі не видно, і їхній order ні на що не впливає.
+function reorderTasks(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return false;
+  const tasks = loadTasks();
+  const open = tasks.filter(t => !tDone(t))
+    .sort((a, b) => (Number(a.order) - Number(b.order)) || (Number(a.createdAt) - Number(b.createdAt)));
+  const fi = open.findIndex(t => t.id === fromId);
+  const ti = open.findIndex(t => t.id === toId);
+  if (fi < 0 || ti < 0) return false;
+  const [moved] = open.splice(fi, 1);
+  open.splice(ti, 0, moved);
+  open.forEach((t, i) => { t.order = i + 1; });
+  saveTasks(tasks);
+  commit();
+  return true;
 }
 
 function nextGoalOrder() {
@@ -3133,7 +3161,10 @@ function renderOpen() {
   // Порядок — ХРОНОЛОГІЧНИЙ: старіші зверху, нове додається в кінець.
   // «У роботі» це черга, а не стрічка новин; до того ж серія дублів має
   // читатись як (2), (3), (4) згори вниз, а не навпаки.
-  const open = loadTasks().filter(t => !tDone(t)).sort((a, b) => a.createdAt - b.createdAt);
+  // Порядок — РУЧНИЙ (перетягування за ⠿); нове й дублі стають у кінець, бо
+  // отримують order = максимум + 1. createdAt — лише запасний ключ.
+  const open = loadTasks().filter(t => !tDone(t))
+    .sort((a, b) => (Number(a.order) - Number(b.order)) || (Number(a.createdAt) - Number(b.createdAt)));
   $("open-h").innerHTML = 'У РОБОТІ' + (open.length ? ' · ' + open.length : '') +
     '<button class="add" id="task-add">+ задача</button>';
   if (!open.length) { $("open-list").innerHTML = '<div class="empty">' + esc(EMPTY_STATES.open) + '</div>'; return; }
@@ -3165,6 +3196,7 @@ function renderOpen() {
       // ⚠️ Назва і кнопки — РІЗНІ рядки, як у цілі. В один рядок вони не
       // влазять, і кнопки «стрибали» б залежно від довжини назви.
       '<div class="task-top">',
+      '<span class="grip" data-tact="grip" title="Перетягни, щоб змінити порядок">⠿</span>',
       (hasSteps ? '<button class="mini exp" data-tact="exp" title="' +
         (open ? 'Згорнути підзадачі' : 'Розгорнути підзадачі') + '">' + (open ? '▾' : '▸') + '</button>' : ''),
       '<span class="task-t">', esc(t.title), '</span>',
@@ -3518,46 +3550,52 @@ $("goal-list").addEventListener("click", e => {
   else if (act === "ecancel") { _editGoal = null; refresh("goals"); }
 });
 
-/* ── Перетягування цілей ──
+/* ── Перетягування: цілі й задачі «У роботі» — один механізм ──
    ⚠️ draggable вмикається ЛИШЕ поки затиснута ручка ⠿. Якби рядок був
    draggable завжди, у ньому не можна було б виділити текст і працювати
-   з полем прогресу — браузер перехоплював би затиск як початок перетягування. */
-let _dragGoal = null;
-$("goal-list").addEventListener("mousedown", e => {
-  const grip = e.target.closest('[data-gact="grip"]');
-  if (!grip) return;
-  const box = grip.closest("[data-goal]");
-  if (box) box.setAttribute("draggable", "true");
-});
-$("goal-list").addEventListener("dragstart", e => {
-  const box = e.target.closest("[data-goal]");
-  if (!box) return;
-  _dragGoal = box.dataset.goal;
-  box.classList.add("dragging");
-  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-});
-$("goal-list").addEventListener("dragover", e => {
-  if (!_dragGoal) return;
-  e.preventDefault();                       // без цього drop не спрацює взагалі
-  const box = e.target.closest("[data-goal]");
-  for (const el of $("goal-list").querySelectorAll(".over")) el.classList.remove("over");
-  if (box && box.dataset.goal !== _dragGoal) box.classList.add("over");
-});
-$("goal-list").addEventListener("drop", e => {
-  e.preventDefault();
-  const box = e.target.closest("[data-goal]");
-  if (box && _dragGoal) reorderGoals(_dragGoal, box.dataset.goal);
-  _dragGoal = null;
-});
-// dragend спрацьовує завжди — і при вдалому кидку, і при скасуванні,
-// тож прибирання підсвіток і draggable живе саме тут.
-$("goal-list").addEventListener("dragend", () => {
-  _dragGoal = null;
-  for (const el of $("goal-list").querySelectorAll("[data-goal]")) {
-    el.classList.remove("dragging", "over");
-    el.removeAttribute("draggable");
-  }
-});
+   з полями — браузер перехоплював би затиск як початок перетягування. */
+function bindDragReorder(listId, attr, reorder) {
+  const list = $(listId);
+  const sel = "[data-" + attr + "]";
+  let dragId = null;
+  list.addEventListener("mousedown", e => {
+    const grip = e.target.closest(".grip");
+    if (!grip) return;
+    const box = grip.closest(sel);
+    if (box) box.setAttribute("draggable", "true");
+  });
+  list.addEventListener("dragstart", e => {
+    const box = e.target.closest(sel);
+    if (!box) return;
+    dragId = box.dataset[attr];
+    box.classList.add("dragging");
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+  list.addEventListener("dragover", e => {
+    if (!dragId) return;
+    e.preventDefault();                       // без цього drop не спрацює взагалі
+    const box = e.target.closest(sel);
+    for (const el of list.querySelectorAll(".over")) el.classList.remove("over");
+    if (box && box.dataset[attr] !== dragId) box.classList.add("over");
+  });
+  list.addEventListener("drop", e => {
+    e.preventDefault();
+    const box = e.target.closest(sel);
+    if (box && dragId) reorder(dragId, box.dataset[attr]);
+    dragId = null;
+  });
+  // dragend спрацьовує завжди — і при вдалому кидку, і при скасуванні,
+  // тож прибирання підсвіток і draggable живе саме тут.
+  list.addEventListener("dragend", () => {
+    dragId = null;
+    for (const el of list.querySelectorAll(sel)) {
+      el.classList.remove("dragging", "over");
+      el.removeAttribute("draggable");
+    }
+  });
+}
+bindDragReorder("goal-list", "goal", reorderGoals);
+bindDragReorder("open-list", "task", reorderTasks);
 
 // Кроки й підкроки — СПІЛЬНИЙ обробник для цілей і задач: розмітка дерева
 // однакова, тож дублювати логіку на два списки нема сенсу. kind вирішує,
