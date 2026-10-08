@@ -973,19 +973,21 @@ const SCRIPT = `(async function () {
     };
     const thPts = () => document.querySelector("#thermo .th-pts").textContent;
     localStorage.clear(); refresh();
-    ok("порожній день — 0 п.", thPts(), "0 п.");
+    ok("порожній день — 0 п.", thPts(), "0");
     ok("порожній день — до плану 6", thHas("до плану 6"), true);
     addDone("Звичайна", "d_normal"); addDone("Складна", "d_hard");     // 500 + 1750 = 2250
-    ok("2250 XP = 4 пункти", thPts(), "4 п.");
+    ok("2250 XP = 4 пункти", thPts(), "4");
     ok("до плану — 2", thHas("до плану 2"), true);
     addDone("Помітна", "d_notable");                                    // 3125
     ok("план виконано", thHas("план ✓"), true);
     addDone("Складна 2", "d_hard");                                     // 4875 → 9 п.
-    ok("9 пунктів", thPts(), "9 п.");
+    ok("9 пунктів", thPts(), "9");
     ok("понад план +3", thHas("понад план +3"), true);
-    ok("кулька — колір зони 9–12", document.querySelector("#thermo circle").getAttribute("fill"), "#ff7a3a");
+    ok("кружок — колір зони 9–12", document.querySelector("#thermo .th-ring").getAttribute("stroke"), "#ff7a3a");
+    ok("поділок 19 (16 + запас)", document.querySelectorAll("#thermo line").length, 19);
+    ok("штрихпунктиру «план» немає", document.querySelector("#thermo [stroke-dasharray]"), null);
     addDone("Велика", "d_big"); addDone("Велика 2", "d_big");           // 11875 → обрізано до 16
-    ok("стеля — 16 п.", thPts(), "16 п.");
+    ok("стеля — 16 п.", thPts(), "16");
     ok("понад 16 — МАКС", thHas("МАКС"), true);
     // Статистика пунктів: сьогодні 11 875 XP = 23 п. (без стелі), план виконано.
     ok("пунктів сьогодні (без стелі шкали)", S().points.today, 23);

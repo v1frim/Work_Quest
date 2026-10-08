@@ -346,7 +346,7 @@ h1 {
    кліки лівої панелі. */
 #thermo {
   position: fixed; left: var(--fix-inset); top: 50%; transform: translateY(-50%); z-index: 150;
-  width: 142px; box-sizing: border-box;
+  width: 134px; box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 14px 10px 12px; user-select: none; pointer-events: none;
   background: var(--surface-fixed); border: var(--bd-fixed);
@@ -2717,61 +2717,48 @@ function renderThermo() { $("thermo").innerHTML = planScaleHtml(S().today.xp); }
 function planZone(p) { return PLAN_ZONES.find(z => p >= z.from && p <= z.to) || PLAN_ZONES[PLAN_ZONES.length - 1]; }
 function planScaleHtml(dayXp) {
   const pts = Math.min(PLAN_MAX, Math.floor(Math.max(0, dayXp) / PLAN_XP_PER_POINT));
-  const H = 360, top = 14, bottom = H - 46, step = (bottom - top) / PLAN_TOP;
-  const y = p => (bottom - p * step).toFixed(1);
-  const tubeX = 70, tubeW = 14, zMax = PLAN_ZONES[PLAN_ZONES.length - 1];
-  const stop = p => (p / PLAN_MAX).toFixed(3);
+  const H = 340, bottom = 284, tubeX = 66, tubeW = 10, cx = tubeX + tubeW / 2;
+  // Позиції поділок: відстань між ними зменшується догори (gap зони).
+  const ys = [bottom];
+  for (let p = 1; p <= PLAN_TOP; p++) ys[p] = ys[p - 1] - planZone(p).gap;
+  const topY = ys[PLAN_TOP] - 6;
+  const zMax = PLAN_ZONES.find(z => z.to === PLAN_MAX);
+  const stop = p => ((bottom - ys[p]) / (bottom - ys[PLAN_MAX])).toFixed(3);
   const h = [
-    '<svg width="122" height="', H, '" viewBox="0 0 122 ', H, '">',
-    '<defs><linearGradient id="th-grad" x1="0" y1="', bottom, '" x2="0" y2="', y(PLAN_MAX), '" gradientUnits="userSpaceOnUse">',
+    '<svg width="114" height="', H, '" viewBox="0 0 114 ', H, '">',
+    '<defs><linearGradient id="th-grad" x1="0" y1="', bottom, '" x2="0" y2="', ys[PLAN_MAX], '" gradientUnits="userSpaceOnUse">',
     '<stop offset="0" stop-color="', PLAN_ZONES[0].col, '"/>',
     '<stop offset="', stop(PLAN_ZONES[0].to), '" stop-color="', PLAN_ZONES[0].col, '"/>',
     '<stop offset="', stop(PLAN_ZONES[1].to), '" stop-color="', PLAN_ZONES[1].col, '"/>',
     '<stop offset="', stop(PLAN_ZONES[2].to), '" stop-color="', PLAN_ZONES[2].col, '"/>',
     '<stop offset="1" stop-color="#ff3b3b"/></linearGradient>',
-    '<filter id="th-glow"><feGaussianBlur stdDeviation="3"/></filter></defs>',
-    // трубка
-    '<rect x="', tubeX, '" y="', (y(PLAN_TOP) - 4).toFixed(1), '" width="', tubeW, '" height="',
-    (bottom - y(PLAN_TOP) + 4).toFixed(1), '" rx="7" fill="#0a0d16" stroke="#2a3044"/>'
+    '<linearGradient id="th-gloss" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".18"/>',
+    '<stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>',
+    // скляна трубка
+    '<rect x="', tubeX, '" y="', topY, '" width="', tubeW, '" height="', bottom - topY + 6,
+    '" rx="5" fill="#0a0d16" stroke="#2a3044"/>'
   ];
-  // заливка зі світінням
-  if (pts > 0) {
-    const yy = y(pts), hh = (bottom - yy).toFixed(1);
-    h.push('<rect x="', tubeX + 2, '" y="', yy, '" width="', tubeW - 4, '" height="', hh, '" rx="5" fill="url(#th-grad)"/>',
-           '<rect x="', tubeX + 2, '" y="', yy, '" width="', tubeW - 4, '" height="', hh,
-           '" rx="5" fill="url(#th-grad)" opacity=".55" filter="url(#th-glow)"/>');
-  }
-  // риски: чим вище, тим коротші, тонші й тепліші; цифри — 1–6 і межі зон
-  for (let p = 1; p <= PLAN_MAX; p++) {
-    const z = planZone(p), reached = p <= pts, yy = y(p);
-    const x2 = tubeX - 4, x1 = x2 - z.len;
-    h.push('<line x1="', x1, '" y1="', yy, '" x2="', x2, '" y2="', yy, '" stroke="', z.col,
-           '" stroke-opacity="', (reached ? 1 : .35), '" stroke-width="', z.w, '" stroke-linecap="round"/>');
-    const big = p <= PLAN_POINTS;
-    if (big || p === 8 || p === 12 || p === PLAN_MAX) {
-      const fs = big ? 12 : p <= 8 ? 10.5 : p <= 12 ? 9 : 8;
-      const bold = p === PLAN_POINTS || p === 8 || p === 12 || p === PLAN_MAX;
-      h.push('<text x="', x1 - 5, '" y="', (+yy + fs * 0.36).toFixed(1), '" text-anchor="end" font-size="', fs,
-             '" font-weight="', (bold ? 800 : 600), '" fill="', (reached ? z.col : "#7d859b"), '">', p, '</text>');
+  if (pts > 0)
+    h.push('<rect x="', tubeX + 2, '" y="', ys[pts], '" width="', tubeW - 4, '" height="', bottom - ys[pts] + 4,
+           '" rx="3" fill="url(#th-grad)"/>');
+  h.push('<rect x="', tubeX + 1, '" y="', topY + 1, '" width="4" height="', bottom - topY + 4, '" rx="2" fill="url(#th-gloss)"/>');
+  // поділки: лише зліва; догори коротші, тонші й тепліші; цифри — 1–6 і межі зон
+  for (let p = 1; p <= PLAN_TOP; p++) {
+    const z = planZone(p), reached = p <= pts, y = ys[p], x2 = tubeX - 4, x1 = x2 - z.len;
+    h.push('<line x1="', x1, '" y1="', y, '" x2="', x2, '" y2="', y, '" stroke="', z.col, '" stroke-opacity="',
+           (z.ghost ? .18 : reached ? 1 : .32), '" stroke-width="', z.w, '" stroke-linecap="round"/>');
+    if (p <= PLAN_POINTS || p === 8 || p === 12 || p === PLAN_MAX) {
+      const fs = p <= PLAN_POINTS ? 12 : p <= 8 ? 10.5 : p <= 12 ? 9.5 : 8.5;
+      const bold = p === PLAN_POINTS || p === PLAN_MAX;
+      h.push('<text x="', x1 - 5, '" y="', (y + fs * 0.36).toFixed(1), '" text-anchor="end" font-size="', fs,
+             '" font-weight="', (bold ? 800 : 600), '" fill="', (reached ? z.col : "#6b7387"), '">', p, '</text>');
     }
   }
-  // позначка плану
-  h.push('<line x1="', tubeX - 2, '" y1="', y(PLAN_POINTS), '" x2="', tubeX + tubeW + 6, '" y2="', y(PLAN_POINTS),
-         '" stroke="#fff" stroke-opacity=".7" stroke-width="1.2" stroke-dasharray="3 2"/>',
-         '<text x="', tubeX + tubeW + 8, '" y="', (+y(PLAN_POINTS) + 3.5).toFixed(1),
-         '" font-size="9" fill="#fff" fill-opacity=".8" font-weight="700">план</text>');
-  // смужки зон праворуч — загоряються, коли заходиш у зону
-  for (let i = 1; i < PLAN_ZONES.length; i++) {
-    const z = PLAN_ZONES[i];
-    h.push('<line x1="', tubeX + tubeW + 4, '" y1="', y(z.to), '" x2="', tubeX + tubeW + 4, '" y2="', y(z.from),
-           '" stroke="', z.col, '" stroke-opacity="', (pts >= z.from ? .9 : .3), '" stroke-width="2" stroke-linecap="round"/>');
-  }
-  // кулька — колір поточної зони
-  const bz = pts > 0 ? planZone(pts).col : PLAN_ZONES[0].col;
-  h.push('<circle cx="', tubeX + tubeW / 2, '" cy="', bottom + 20, '" r="15" fill="', bz, '" opacity="', (pts > 0 ? 1 : .55), '"/>');
-  if (pts > 0) h.push('<circle cx="', tubeX + tubeW / 2, '" cy="', bottom + 20, '" r="15" fill="', bz, '" opacity=".6" filter="url(#th-glow)"/>');
-  h.push('<rect x="', tubeX + 2, '" y="', bottom - 6, '" width="', tubeW - 4, '" height="14" fill="',
-         (pts > 0 ? PLAN_ZONES[0].col : "#0a0d16"), '"/></svg>');
+  // кружок із кількістю пунктів замість кульки — колір поточної зони
+  const bz = pts > 0 ? planZone(pts).col : "#3a4156";
+  h.push('<circle class="th-ring" cx="', cx, '" cy="', bottom + 30, '" r="17" fill="none" stroke="', bz, '" stroke-width="3"/>',
+         '<text class="th-pts" x="', cx, '" y="', bottom + 35, '" text-anchor="middle" font-size="14" font-weight="800" fill="',
+         (pts > 0 ? bz : "#7d859b"), '">', pts, '</text></svg>');
 
   const z = pts ? planZone(pts) : PLAN_ZONES[0];
   const left = Math.max(0, PLAN_POINTS - pts);
@@ -2779,12 +2766,7 @@ function planScaleHtml(dayXp) {
     : pts >= PLAN_MAX ? ['<b style="color:', zMax.col, '">МАКС</b>'].join("")
     : pts > PLAN_POINTS ? ['понад план <b style="color:', z.col, '">+', pts - PLAN_POINTS, '</b>'].join("")
     : ['<b style="color:', PLAN_ZONES[0].col, '">план ✓</b>'].join("");
-  return [
-    '<div class="th-cap">ПЛАНИ</div>',
-    '<div class="th-pts" style="color:', (pts ? z.col : "#7d859b"), '">', pts, ' п.</div>',
-    h.join(""),
-    '<div class="th-foot">', foot, '</div>'
-  ].join("");
+  return ['<div class="th-cap">ПЛАНИ</div>', h.join(""), '<div class="th-foot">', foot, '</div>'].join("");
 }
 
 function renderToday() {
