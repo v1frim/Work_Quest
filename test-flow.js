@@ -987,6 +987,11 @@ const SCRIPT = `(async function () {
     addDone("Велика", "d_big"); addDone("Велика 2", "d_big");           // 11875 → обрізано до 16
     ok("стеля — 16 п.", thPts(), "16 п.");
     ok("понад 16 — МАКС", thHas("МАКС"), true);
+    // Статистика пунктів: сьогодні 11 875 XP = 23 п. (без стелі), план виконано.
+    ok("пунктів сьогодні (без стелі шкали)", S().points.today, 23);
+    ok("днів із планом", S().points.planDays, 1);
+    ok("середнє по активних днях", S().points.avgActive, 23);
+    ok("рядок у статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із планом 6 п.") >= 0, true);
 
     // 19. Копія в один файл (File System Access API).
     localStorage.clear();

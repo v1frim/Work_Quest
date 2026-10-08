@@ -1781,6 +1781,17 @@ function computeStats() {
       donePerMonth: monthsPassed ? done / monthsPassed : 0,
       xpPerMonth: monthsPassed ? xpTotal / monthsPassed : 0
     },
+    // Пункти шкали «ПЛАНИ»: 1 пункт = PLAN_XP_PER_POINT XP дня. Середнє —
+    // по АКТИВНИХ днях (день без жодного XP не тягне середнє вниз).
+    points: (function () {
+      let sum = 0, n = 0, planDays = 0;
+      for (const k of keys) {
+        const pts = Math.floor(dayMap[k].xp / PLAN_XP_PER_POINT);
+        sum += pts; n++;
+        if (pts >= PLAN_POINTS) planDays++;
+      }
+      return { avgActive: n ? sum / n : 0, planDays, today: Math.floor(t0.xp / PLAN_XP_PER_POINT) };
+    })(),
     weekday: { avgDone: weekdayAvg, best: { idx: wdBest, name: wdBest >= 0 ? WEEKDAY_NAMES[wdBest] : "—", avg: wdBestV } },
     hours: { early, late },
     level: lvl,
@@ -2834,6 +2845,8 @@ function renderTotals() {
   row("🏅", "Найдовша серія", s.streak.best);
   row("📊", "Сер. задач/день", s.avg.donePerCalendarDay.toFixed(1));
   row("📊", "Сер. задач/місяць", s.avg.donePerMonth.toFixed(1));
+  row("🌡", "Сер. пунктів/акт. день", s.points.avgActive.toFixed(1));
+  row("🎯", "Днів із планом " + PLAN_POINTS + " п.", s.points.planDays);
   row("🗓", "Найкращий день тижня", s.weekday.best.idx >= 0 ? s.weekday.best.name : "—");
   $("tot-list").innerHTML = h.join("");
 }
