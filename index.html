@@ -339,6 +339,9 @@ h1 {
 .tot-r { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; }
 .tot-r + .tot-r { border-top: var(--bd-row); }
 .tot-r .l { flex: 1 1 auto; min-width: 0; color: var(--tx-3); }
+/* ⚠️ Значок — у колонці ФІКСОВАНОЇ ширини. Емодзі мають різну ширину
+   (⛏, 🌡, ⚡ вужчі за ✅), і без цього підписи стояли «драбинкою». */
+.tot-r .ic { flex: 0 0 18px; width: 18px; text-align: center; }
 .tot-r .v { font-weight: 700; color: var(--tx-1); }
 
 /* Термометр планів (макет власника, сесія 4): SVG-шкала пунктів дня.
@@ -2816,7 +2819,7 @@ function renderTotals() {
   const difs = loadDifs().sort((a, b) => (a.order | 0) - (b.order | 0));
   const h = [];
   const row = (ic, label, val, color) => h.push(
-    '<div class="tot-r"><span>', ic, '</span><span class="l"', (color ? ' style="color:' + color + '"' : ''),
+    '<div class="tot-r"><span class="ic">', ic, '</span><span class="l"', (color ? ' style="color:' + color + '"' : ''),
     '>', esc(label), '</span><span class="v">', esc(String(val)), '</span></div>'
   );
   row("✅", "Задач виконано", s.tasks.done);
@@ -2833,7 +2836,7 @@ function renderTotals() {
   row("📊", "Сер. задач/місяць", s.avg.donePerMonth.toFixed(1));
   row("🌡", "Сер. пунктів/акт. день", s.points.avgActive.toFixed(1));
   row("🎯", "Днів із планом " + PLAN_POINTS + " п.", s.points.planDays);
-  row("🗓", "Найкращий день тижня", s.weekday.best.idx >= 0 ? s.weekday.best.name : "—");
+  row("🗓", "Найкращий день тижня", s.weekday.best.idx >= 0 ? WEEKDAY_SHORT[s.weekday.best.idx] : "—");
   $("tot-list").innerHTML = h.join("");
 }
 

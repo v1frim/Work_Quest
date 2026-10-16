@@ -995,6 +995,10 @@ const SCRIPT = `(async function () {
     ok("днів із планом", S().points.planDays, 1);
     ok("середнє по активних днях", S().points.avgActive, 23);
     ok("рядок у статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із планом 6 п.") >= 0, true);
+    // Підписи статистики — в одну лінію: колонка значків фіксованої ширини.
+    const lx = [...document.querySelectorAll("#tot-list .tot-r .l")].map(e => Math.round(e.getBoundingClientRect().left));
+    ok("підписи статистики вирівняні", new Set(lx).size, 1);
+    ok("день тижня скорочено", WEEKDAY_SHORT.indexOf(document.querySelector("#tot-list .tot-r:last-child .v").textContent) >= 0, true);
 
     // 19. Копія в один файл (File System Access API).
     localStorage.clear();
