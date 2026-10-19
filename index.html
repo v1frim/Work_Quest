@@ -517,6 +517,31 @@ h1 {
 }
 .sec-h .add:hover { background: var(--solid-btn-hov); }
 
+/* — лічильники активності — */
+#cnt-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 14px; }
+#cnt-list.hidden { display: none; }
+.cnt {
+  padding: 8px 10px 7px; border-radius: var(--r-btn);
+  background: linear-gradient(0deg, var(--c-t), var(--c-t)), var(--solid-btn);
+  border: 1px solid var(--c-b);
+}
+.cnt-top { display: flex; align-items: baseline; gap: 6px; }
+.cnt-ic  { flex: 0 0 auto; font-size: 14px; }
+.cnt-n   { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 700; color: var(--tx-1); overflow-wrap: anywhere; }
+.cnt-v   { flex: 0 0 auto; font-size: 18px; font-weight: 800; color: var(--c); }
+.cnt-sub { font-size: 10.5px; color: var(--tx-5); margin-top: 1px; }
+.cnt-ctl { display: flex; gap: 4px; margin-top: 6px; }
+.cnt-ctl .mini { flex: 1 1 auto; padding: 3px 0; text-align: center; }
+.cnt-ctl .mini.go { flex: 2 1 auto; color: var(--c); border-color: var(--c-b); font-weight: 700; }
+.cnt.draft .fld { width: 100%; box-sizing: border-box; margin-top: 6px; font-size: 12px; padding: 4px 8px; }
+/* Віхи — хронологія «жирних» цілей у лівій панелі */
+.mile { display: flex; align-items: baseline; gap: 8px; padding: 4px 2px; font-size: 13px; }
+.mile + .mile { border-top: var(--bd-row); }
+.mile-d { flex: 0 0 auto; font-size: 11px; color: var(--tx-5); font-variant-numeric: tabular-nums; }
+.mile-t { flex: 1 1 auto; min-width: 0; color: var(--tx-1); overflow-wrap: anywhere; }
+.mile-x { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--gold); }
+.goal-big { flex: 0 0 auto; color: var(--gold); font-size: 13px; }
+
 /* — ціль — */
 /* Колір лівої межі й підпису XP = ВАГА цілі за GOAL_TIERS (аналог складності
    задачі). Тінт поверх соліда — щоб читалось на всіх фазах доби. */
@@ -848,6 +873,8 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
     <div class="panel-h">🎯 Цілі та задачі</div>
     <div class="panel-sub">Довгі цілі з прогресом і те, що зараз у роботі</div>
     <div class="scroll-wrap"><div class="scroll">
+      <div class="sec-h" id="cnt-h">АКТИВНІСТЬ<button class="add" id="cnt-add" title="Лічильники створюються в ⚙️ Налаштуваннях">+ лічильник</button></div>
+      <div id="cnt-list"></div>
       <div class="sec-h">ЦІЛІ<button class="add" id="goal-add">+ ціль</button></div>
       <div id="goal-list"></div>
       <div class="sec-h" id="open-h">У РОБОТІ<button class="add" id="task-add">+ задача</button></div>
@@ -1071,6 +1098,7 @@ const WQ_KEYS = {
   ach:       { key: "workquest_ach_v1",          klass: "data" },
   eventLog:  { key: "workquest_event_log_v1",    klass: "data" },
   trash:     { key: "workquest_trash_v1",        klass: "data" },
+  counters:  { key: "workquest_counters_v1",     klass: "data" },
 
   recBest:   { key: "workquest_records_best_v1", klass: "derived" },
   levelupAt: { key: "workquest_levelup_at_v1",   klass: "derived" },
@@ -1258,6 +1286,14 @@ function loadDifs() {
   return a;
 }
 function saveDifs(a) { return saveJSON(K.difs, a); }
+/* ── Лічильники активності (сесія 4, за зразком AI-трекера власника) ──
+   Лічильник — це ШАБЛОН повторюваної дії («Новий товар», «Перебрано товарів»)
+   зі своєю складністю. ⚠️ Значення лічильника НЕ зберігається: воно = кількість
+   виконаних задач із counterId. «+1» створює звичайну виконану задачу з
+   номером (seq), тож XP, день, рекорди й «Прогрес по днях» рахуються як
+   завжди — жодного паралельного журналу. */
+function loadCounters() { const a = loadJSON(K.counters, []); return Array.isArray(a) ? a : []; }
+function saveCounters(a) { return saveJSON(K.counters, a); }
 function loadPlan() { return Object.assign({}, DEFAULT_PLAN, loadJSON(K.plan, {})); }
 // Планки дня в пунктах; пункт дня = floor(XP дня / PLAN_XP_PER_POINT).
 function planPts() {
@@ -1498,6 +1534,9 @@ function sanitizeData() {
       if (t.goalId != null || t.stepId != null) fixed++;
       t.goalId = null; t.stepId = null;
     }
+    // Прив'язка до лічильника: або рядок + номер, або нічого.
+    if (t.counterId != null && typeof t.counterId !== "string") { t.counterId = null; fixed++; }
+    if (t.counterId && typeof t.seq !== "number") { t.seq = 0; fixed++; }
     // Кроки в задачі — така сама форма, як у цілі: «крок → підкроки».
     if (!Array.isArray(t.steps)) { t.steps = []; fixed++; }
     for (const st of t.steps) {
@@ -1546,6 +1585,16 @@ function sanitizeData() {
     }
     if (gDone(g) && !g.doneDay) { g.doneDay = dayKeyOf(g.doneAt); gf++; }
   }
+  // Лічильники: id, назва, складність (неіснуюча → перша активна).
+  const cs = loadCounters(); let cf = 0;
+  for (const c of cs) {
+    if (!c.id) { c.id = rid("c_"); cf++; }
+    if (typeof c.order !== "number") { c.order = cs.indexOf(c) + 1; cf++; }
+    if (!loadDifs().some(d => d.id === c.difficultyId)) { c.difficultyId = (activeDifs()[0] || {}).id || null; cf++; }
+  }
+  if (cf) saveCounters(cs);
+  for (const g of goals) if (g.counterId && !cs.some(c => c.id === g.counterId)) { g.counterId = null; gf++; }
+
   // Кошик прибирається на кожному читанні, але записати почищене треба явно —
   // інакше протерміноване лежало б у localStorage вічно, просто невидиме.
   saveTrash(loadTrash());
@@ -1932,6 +1981,75 @@ function syncLinkedStep(t, done) {
   const r = syncGoalDone(g);
   saveGoals(goals);
   if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + (g.xp | 0) + " XP", true);
+}
+
+/* Наступний номер лічильника — максимум серед УСІХ його задач (і відкритих,
+   і виконаних) + 1: винесена в роботу «№7» уже зайняла свій номер. */
+function nextSeq(counterId) {
+  return loadTasks().reduce((n, t) => (t.counterId === counterId ? Math.max(n, t.seq | 0) : n), 0) + 1;
+}
+function counterTitle(c, seq, note) {
+  const n = String(note || "").trim();
+  return (c.name + " №" + seq + (n ? " (" + n + ")" : "")).slice(0, 200);
+}
+// Скільки лічильник набрав: виконані задачі з його id, за бажанням — від дня.
+function counterCount(counterId, sinceDay) {
+  return loadTasks().filter(t => t.counterId === counterId && tDone(t) &&
+    (!sinceDay || (t.doneDay && t.doneDay >= sinceDay))).length;
+}
+// «+1»: виконана задача одразу; «↗»: відкрита, в «У роботі» (номер зайнято).
+function bumpCounter(counterId, note, asOpen) {
+  const c = loadCounters().find(x => x.id === counterId);
+  if (!c) return false;
+  const seq = nextSeq(counterId), title = counterTitle(c, seq, note);
+  const ok = asOpen ? addOpen(title, c.difficultyId) : addDone(title, c.difficultyId);
+  if (!ok) return false;
+  const tasks = loadTasks(); const t = tasks[tasks.length - 1];
+  t.counterId = counterId; t.seq = seq;
+  saveTasks(tasks);
+  commit();
+  return true;
+}
+function addCounter(name, icon, unit, difficultyId) {
+  const n = String(name || "").trim().slice(0, 60);
+  if (!n) return false;
+  const cs = loadCounters();
+  cs.push({ id: rid("c_"), name: n, icon: String(icon || "📦").slice(0, 4), unit: String(unit || "шт").slice(0, 12),
+            difficultyId: activeDifs().some(d => d.id === difficultyId) ? difficultyId : (activeDifs()[0] || {}).id,
+            order: cs.length + 1, createdAt: Date.now() });
+  saveCounters(cs); commit(); return true;
+}
+function editCounter(id, patch) {
+  const cs = loadCounters(); const c = cs.find(x => x.id === id);
+  if (!c) return false;
+  if (patch.name != null) { const n = String(patch.name).trim().slice(0, 60); if (n) c.name = n; }
+  if (patch.icon != null) c.icon = String(patch.icon).slice(0, 4) || c.icon;
+  if (patch.unit != null) c.unit = String(patch.unit).slice(0, 12);
+  if (patch.difficultyId && activeDifs().some(d => d.id === patch.difficultyId)) c.difficultyId = patch.difficultyId;
+  saveCounters(cs); commit(); return true;
+}
+// Видалення лічильника задач не чіпає: вони лишаються в історії як звичайні.
+function deleteCounter(id) {
+  const cs = loadCounters(); const i = cs.findIndex(x => x.id === id);
+  if (i < 0) return false;
+  const n = counterCount(id);
+  if (!confirm("Видалити лічильник «" + cs[i].name + "»?" + (n ? " Його " + n + " " + plural(n, "задача", "задачі", "задач") + " лишаться в історії." : ""))) return false;
+  cs.splice(i, 1); saveCounters(cs); commit(); return true;
+}
+/* ⚠️ Цілі, прив'язані до лічильника, — ПОХІДНІ: їхній прогрес = виконані
+   задачі лічильника від дня створення цілі. Звіряються на кожному commit(),
+   бо будь-яка зміна журналу задач може їх закрити чи відкрити. Без commit()
+   тут — інакше рекурсія. */
+function syncCounterGoals() {
+  const goals = loadGoals(); let changed = false;
+  for (const g of goals) {
+    if (!g.counterId || g.mode === "steps") continue;
+    const cur = Math.min(g.target | 0, counterCount(g.counterId, dayKeyOf(g.createdAt || 0)));
+    if (cur !== (g.current | 0)) { g.current = cur; changed = true; }
+    const r = syncGoalDone(g);
+    if (r) { changed = true; if (r === "done") toast("🎯 " + WQ_TEXT.goalDone + " · +" + fmtXpNum(g.xp | 0) + " XP", true); }
+  }
+  if (changed) saveGoals(goals);
 }
 
 function completeTask(id) {
@@ -2382,7 +2500,7 @@ function delStep(kind, ownerId, stepId) {
 function setGoalProgress(id, value) {
   const goals = loadGoals();
   const g = goals.find(x => x.id === id);
-  if (!g || g.mode === "steps") return;
+  if (!g || g.mode === "steps" || g.counterId) return;   // прив'язану веде лічильник
   g.current = Math.max(0, Math.min(g.target, Math.round(value) || 0));
   const r = syncGoalDone(g);
   saveGoals(goals);
@@ -2416,9 +2534,14 @@ function editGoal(id, patch) {
   if (!v) return false;
   g.title = v;
   g.xp = Math.max(0, patch.xp | 0);
+  if (patch.big !== undefined) g.big = !!patch.big;          // «жирна» ціль → віха
   if (g.mode !== "steps") {
     g.target = Math.max(1, patch.target | 0);
     g.unit = String(patch.unit || "").trim().slice(0, 12);
+    if (patch.counterId !== undefined) {
+      g.counterId = (patch.counterId && loadCounters().some(c => c.id === patch.counterId)) ? patch.counterId : null;
+      if (g.counterId) g.current = Math.min(g.target, counterCount(g.counterId, dayKeyOf(g.createdAt || 0)));
+    }
     g.current = Math.min(g.current | 0, g.target);
   }
   const r = syncGoalDone(g);
@@ -2673,6 +2796,7 @@ const RENDER = {
   difs:   renderDifRow,
   totals: renderTotals,
   days:   renderDays,
+  counters: renderCounters,
   goals:  renderGoals,
   open:   renderOpen,
   trash:  renderTrash
@@ -2683,6 +2807,7 @@ function refresh(...zones) {
 
 // ⚠️ ЄДИНА ТОЧКА МУТАЦІЇ. Будь-яка зміна даних проходить ТІЛЬКИ через неї.
 function commit() {
+  syncCounterGoals();   // похідні цілі — до перерахунку статистики
   bumpStats();
   refresh();
   checkLevelUp();
@@ -2949,6 +3074,7 @@ function renderDays() {
     const g = group(older, k => k.slice(0, 4));
     for (const [y, agg] of [...g.entries()].sort().reverse()) h.push(progRow(y, agg, false, agg.days));
   }
+  h.push(milestonesHtml());
   $("prog-list").innerHTML = h.join("");
 }
 
@@ -3140,6 +3266,54 @@ function stepsHtml(kind, o, note) {
   return h.join("");
 }
 
+/* Картки лічильників. Чернетка «+1»/«↗» — інлайн у картці: назва вже
+   підставлена з номером, користувач лише уточнює (напр. «тактична аптечка»). */
+let _cntDraft = null;   // { id, asOpen }
+function renderCounters() {
+  const cs = loadCounters().slice().sort((a, b) => (a.order | 0) - (b.order | 0));
+  const list = $("cnt-list");
+  list.classList.toggle("hidden", !cs.length);
+  $("cnt-h").classList.toggle("hidden", !cs.length && !_cntDraft);
+  const tasks = loadTasks();
+  const h = [];
+  for (const c of cs) {
+    const d = getDif(c.difficultyId);
+    const mine = tasks.filter(t => t.counterId === c.id);
+    const done = mine.filter(tDone).length, openN = mine.length - done;
+    const st = ["--c:", d.color, ";--c-t:", hexToRgba(d.color, 0.10), ";--c-b:", hexToRgba(d.color, 0.34)].join("");
+    const dr = _cntDraft && _cntDraft.id === c.id;
+    h.push('<div class="cnt', (dr ? ' draft' : ''), '" style="', st, '" data-cnt="', escAttr(c.id), '">',
+      '<div class="cnt-top"><span class="cnt-ic">', esc(c.icon), '</span><span class="cnt-n">', esc(c.name), '</span>',
+      '<span class="cnt-v" title="Виконано всього">', done, '</span></div>',
+      '<div class="cnt-sub">', esc(d.icon + " " + d.name), ' · +', fmtXpNum(d.xp), ' XP/', esc(c.unit || "шт"),
+      (openN ? ' · <b>' + openN + '</b> у роботі' : ''), '</div>');
+    if (dr) {
+      h.push('<input class="fld" id="cnt-draft-input" placeholder="уточнення (необов\'язково)" maxlength="120" value="', escAttr(_cntDraft.note || ""), '">',
+        '<div class="cnt-sub">буде: <b>', esc(counterTitle(c, nextSeq(c.id), _cntDraft.note)), '</b></div>',
+        '<div class="cnt-ctl"><button class="mini go" data-cact="commit">', (_cntDraft.asOpen ? '↗ у роботу' : '✓ записати'), '</button>',
+        '<button class="mini" data-cact="cancel">✕</button></div>');
+    } else {
+      h.push('<div class="cnt-ctl">',
+        '<button class="mini" data-cact="undo" title="Прибрати останній запис (у кошик)">−</button>',
+        '<button class="mini" data-cact="open" title="Наступний — у «У роботі», номер підбереться сам">↗</button>',
+        '<button class="mini go" data-cact="plus" title="Записати виконаним зараз">+1</button>',
+        '</div>');
+    }
+    h.push('</div>');
+  }
+  list.innerHTML = h.join("");
+}
+
+// Віхи — досягнуті «жирні» цілі, хронологічно, з датою. Прогресія видна одразу.
+function milestonesHtml() {
+  const big = loadGoals().filter(g => g.big && gDone(g)).sort((a, b) => b.doneAt - a.doneAt);
+  if (!big.length) return "";
+  const h = ['<div class="prog-sect">⭐ ВІХИ</div>'];
+  for (const g of big) h.push('<div class="mile"><span class="mile-d">', esc(fmtDay(g.doneDay)), '</span>',
+    '<span class="mile-t">', esc(g.title), '</span><span class="mile-x">+', fmtXpNum(gXp(g)), '</span></div>');
+  return h.join("");
+}
+
 function renderGoals() {
   // Досягнуті — донизу, решта за ручним порядком.
   const goals = loadGoals().slice().sort((a, b) =>
@@ -3168,6 +3342,12 @@ function renderGoals() {
           '<span class="edit-lbl">мета</span><input class="fld ge-target" type="number" min="1" value="' + (g.target | 0) + '" style="width:76px">' +
           '<input class="fld ge-unit" value="' + escAttr(g.unit || "") + '" placeholder="шт" style="width:64px">'),
         '<span class="edit-lbl">XP</span><input class="fld ge-xp" type="number" min="0" step="10" value="', (g.xp | 0), '" style="width:80px">',
+        '</div><div class="edit-row">',
+        (steps ? '' : '<span class="edit-lbl">лічильник</span><select class="fld ge-cnt"><option value="">— вручну —</option>' +
+          loadCounters().map(c => '<option value="' + escAttr(c.id) + '"' + (c.id === g.counterId ? ' selected' : '') + '>' +
+            esc(c.icon + " " + c.name) + '</option>').join("") + '</select>'),
+        '<label class="edit-lbl" title="Досягнута жирна ціль потрапляє у «Віхи» з датою"><input type="checkbox" class="ge-big"',
+        (g.big ? ' checked' : ''), '> ★ жирна</label>',
         '<button class="mini" data-gact="esave" title="Зберегти (Enter)">✓</button>',
         '<button class="mini" data-gact="ecancel" title="Скасувати (Esc)">✕</button>',
         '</div></div>'
@@ -3187,6 +3367,7 @@ function renderGoals() {
       // Перший крок додається кнопкою «+ крок», вона є завжди.
       (hasSteps ? '<button class="mini exp" data-gact="exp" title="' +
         (open ? 'Згорнути план' : 'Розгорнути план') + '">' + (open ? '▾' : '▸') + '</button>' : ''),
+      (g.big ? '<span class="goal-big" title="Жирна ціль — стане віхою">★</span>' : ''),
       '<span class="goal-t">', esc(g.title), '</span>',
       '<span class="goal-xp" title="', escAttr("вага цілі: " + tier.name), '">',
       (dn ? '✓ +' : '+'), (g.xp | 0), ' XP</span></div>',
@@ -3197,10 +3378,17 @@ function renderGoals() {
     if (steps) {
       h.push('<span>', p.cur, ' / ', p.tot, ' ', esc(p.unit), '</span>');
     } else {
-      h.push('<button class="mini" data-gact="dec">−</button>',
-             '<input class="goal-num" type="number" data-gact="set" value="', p.cur, '" min="0" max="', p.tot, '">',
-             '<span>/ ', p.tot, ' ', esc(p.unit), '</span>',
-             '<button class="mini" data-gact="inc">+</button>');
+      if (g.counterId) {
+        // Прогрес веде лічильник — ручних −/+ немає.
+        const c = loadCounters().find(x => x.id === g.counterId);
+        h.push('<span title="Прогрес рахує лічильник від дня створення цілі">', (c ? esc(c.icon) + ' ' : ''),
+               '<b>', p.cur, '</b> / ', p.tot, ' ', esc(p.unit), '</span>');
+      } else {
+        h.push('<button class="mini" data-gact="dec">−</button>',
+               '<input class="goal-num" type="number" data-gact="set" value="', p.cur, '" min="0" max="', p.tot, '">',
+               '<span>/ ', p.tot, ' ', esc(p.unit), '</span>',
+               '<button class="mini" data-gact="inc">+</button>');
+      }
     }
     h.push('<button class="mini" data-gact="addstep" title="Додати крок до плану">+ крок</button>',
            (dn ? '<button class="mini" data-gact="reopen" title="Повернути в роботу">↩</button>' : ''),
@@ -3375,6 +3563,22 @@ function renderSettings() {
     );
   }
   h.push('<button class="mini" id="dif-add">+ додати складність</button></div>');
+
+  h.push('<div class="set-block"><div class="set-sect">Лічильники активності</div>',
+    '<div class="set-note">Повторювані дії зі своєю складністю: «+1» у правій панелі записує виконану задачу з номером («Новий товар №7»), «↗» кладе наступний номер у «У роботі». Ціль можна прив\'язати до лічильника через ✎ — тоді її прогрес рахується сам.</div>');
+  const cnts = loadCounters().sort((a, b) => (a.order | 0) - (b.order | 0));
+  for (const c of cnts) {
+    h.push('<div class="dif-edit" data-cnt="', escAttr(c.id), '" style="--c-b:', hexToRgba(getDif(c.difficultyId).color, 0.34), '">',
+      '<input class="fld f-ic" data-cset="icon" value="', escAttr(c.icon), '" maxlength="4" title="Значок">',
+      '<input class="fld f-nm" data-cset="name" value="', escAttr(c.name), '" maxlength="60" placeholder="Назва">',
+      '<input class="fld" data-cset="unit" value="', escAttr(c.unit || ""), '" maxlength="12" placeholder="шт" style="width:56px" title="Одиниця">',
+      '<select class="fld" data-cset="difficultyId" title="Складність одного запису">',
+      activeDifs().map(d => '<option value="' + escAttr(d.id) + '"' + (d.id === c.difficultyId ? ' selected' : '') + '>' +
+        esc(d.icon + " " + d.name + " +" + fmtXpNum(d.xp)) + '</option>').join(""),
+      '</select>',
+      '<button class="mini dz" data-cact="del" title="Видалити лічильник">🗑</button></div>');
+  }
+  h.push('<button class="mini" id="cnt-new">+ додати лічильник</button></div>');
 
   h.push('<div class="set-block"><div class="set-sect">Плани</div>',
     '<div class="set-note">Планки дня — в пунктах шкали зліва: 1 пункт = ', PLAN_XP_PER_POINT, ' XP (~30 хв роботи).</div>',
@@ -3601,6 +3805,41 @@ $("task-input").addEventListener("keydown", e => {
   if (addByMode(e.target.value, last)) { e.target.value = ""; }
 });
 
+$("cnt-add").addEventListener("click", () => { openSettings(); });
+$("cnt-list").addEventListener("click", e => {
+  const box = e.target.closest("[data-cnt]");
+  const btn = e.target.closest("[data-cact]");
+  if (!box || !btn) return;
+  const id = box.dataset.cnt, act = btn.dataset.cact;
+  if (act === "plus" || act === "open") {
+    _cntDraft = { id, asOpen: act === "open", note: "" };
+    refresh("counters");
+    const i = $("cnt-draft-input"); if (i) i.focus();
+  } else if (act === "commit") {
+    const i = $("cnt-draft-input");
+    const d = _cntDraft; _cntDraft = null;
+    if (d) bumpCounter(d.id, i ? i.value : "", d.asOpen); else refresh("counters");
+  } else if (act === "cancel") { _cntDraft = null; refresh("counters"); }
+  else if (act === "undo") {
+    // Останній запис лічильника — у кошик (через звичайне підтвердження).
+    const last = loadTasks().filter(t => t.counterId === id).sort((a, b) => (b.seq | 0) - (a.seq | 0))[0];
+    if (last) deleteTask(last.id);
+  }
+});
+$("cnt-list").addEventListener("input", e => {
+  if (e.target.id === "cnt-draft-input" && _cntDraft) {
+    _cntDraft.note = e.target.value;
+    const prev = e.target.parentElement.querySelector(".cnt-sub b");
+    const c = loadCounters().find(x => x.id === _cntDraft.id);
+    if (prev && c) prev.textContent = counterTitle(c, nextSeq(c.id), _cntDraft.note);
+  }
+});
+$("cnt-list").addEventListener("keydown", e => {
+  if (e.target.id !== "cnt-draft-input") return;
+  if (e.key === "Enter") { e.preventDefault(); e.target.closest("[data-cnt]").querySelector('[data-cact="commit"]').click(); }
+  else if (e.key === "Escape") { e.stopPropagation(); _cntDraft = null; refresh("counters"); }
+});
+
 $("goal-list").addEventListener("click", e => {
   const box = e.target.closest("[data-goal]");
   const btn = e.target.closest("[data-gact]");
@@ -3627,7 +3866,9 @@ $("goal-list").addEventListener("click", e => {
       title: box.querySelector(".ge-title").value,
       target: +((box.querySelector(".ge-target") || {}).value || 0),
       unit: ((box.querySelector(".ge-unit") || {}).value || ""),
-      xp: +box.querySelector(".ge-xp").value
+      xp: +box.querySelector(".ge-xp").value,
+      counterId: box.querySelector(".ge-cnt") ? box.querySelector(".ge-cnt").value : undefined,
+      big: box.querySelector(".ge-big").checked
     });
     _editGoal = null;
     refresh("goals");
@@ -3975,6 +4216,11 @@ $("set-body").addEventListener("change", e => {
     renderSettings();
     return;
   }
+  const cbox = e.target.closest("[data-cnt]");
+  if (cbox && e.target.dataset.cset) {
+    editCounter(cbox.dataset.cnt, { [e.target.dataset.cset]: e.target.value });
+    return;
+  }
   if (e.target.id === "p-min" || e.target.id === "p-norma" || e.target.id === "p-month") {
     const plan = loadPlan();
     plan.minPts = Math.max(1, +$("p-min").value | 0);
@@ -3986,6 +4232,16 @@ $("set-body").addEventListener("change", e => {
 });
 
 $("set-body").addEventListener("click", e => {
+  if (e.target.id === "cnt-new") {
+    const used = loadCounters().map(c => c.icon);
+    addCounter("Новий лічильник", COUNTER_ICONS.find(i => !used.includes(i)) || "📦", "шт", (activeDifs()[0] || {}).id);
+    renderSettings();
+    const last = $("set-body").querySelector('[data-cnt]:last-of-type [data-cset="name"]');
+    if (last) { last.focus(); last.select(); }
+    return;
+  }
+  const cbox = e.target.closest("[data-cnt]"), cbtn = e.target.closest("[data-cact]");
+  if (cbox && cbtn && cbtn.dataset.cact === "del") { if (deleteCounter(cbox.dataset.cnt)) renderSettings(); return; }
   if (e.target.id === "dif-add") {
     const difs = loadDifs();
     const used = difs.map(d => d.color);

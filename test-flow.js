@@ -1017,6 +1017,72 @@ const SCRIPT = `(async function () {
     ok("підписи статистики вирівняні", new Set(lx).size, 1);
     ok("день тижня скорочено", WEEKDAY_SHORT.indexOf(document.querySelector("#tot-list .tot-r:last-child .v").textContent) >= 0, true);
 
+    // 18c. Лічильники активності: «+1» = виконана задача з номером, «↗» = у роботу,
+    // прив'язана ціль рахується сама, «жирна» досягнута ціль стає віхою.
+    localStorage.clear();
+    ok("без лічильників блоку немає", document.getElementById("cnt-list").classList.contains("hidden"), true);
+    addCounter("Новий товар", "📦", "шт", "d_hard");
+    const cid = loadCounters()[0].id;
+    ok("лічильник створено", loadCounters().length, 1);
+    ok("картка з'явилась", document.querySelectorAll("#cnt-list .cnt").length, 1);
+    // «+1» кліком: чернетка → уточнення → ✓
+    document.querySelector('[data-cnt="' + cid + '"] [data-cact="plus"]').click();
+    const ci = document.getElementById("cnt-draft-input");
+    ok("чернетка лічильника відкрилась", ci !== null, true);
+    ci.value = "тактична аптечка";
+    document.querySelector('[data-cnt="' + cid + '"] [data-cact="commit"]').click();
+    const ct = loadTasks()[0];
+    ok("задача з номером створена", ct.title, "Новий товар №1 (тактична аптечка)");
+    ok("задача виконана одразу", tDone(ct), true);
+    ok("задача знає свій лічильник", ct.counterId, cid);
+    ok("XP — за складністю лічильника", S().xp.total, getDif("d_hard").xp);
+    ok("лічильник показує 1", document.querySelector('[data-cnt="' + cid + '"] .cnt-v').textContent, "1");
+    // «↗» — наступний номер у роботу; номер зайнято, тож «+1» після нього дасть №3
+    bumpCounter(cid, "", true);
+    const ot = loadTasks().find(x => !tDone(x));
+    ok("у роботу — №2", ot.title, "Новий товар №2");
+    ok("у роботу — відкрита", tDone(ot), false);
+    ok("картка бачить «у роботі»", document.querySelector('[data-cnt="' + cid + '"] .cnt-sub').textContent.indexOf("у роботі") >= 0, true);
+    bumpCounter(cid, "", false);
+    ok("номер не повторюється: №3", loadTasks().map(x => x.seq).sort().join(","), "1,2,3");
+    completeTask(ot.id);
+    ok("закрита відкрита — лічильник 3", counterCount(cid), 3);
+    // «−» прибирає останній запис (у кошик)
+    document.querySelector('[data-cnt="' + cid + '"] [data-cact="undo"]').click();
+    ok("«−» прибрав останній", counterCount(cid), 2);
+    ok("він у кошику", loadTrash().length, 1);
+
+    // Прив'язана ціль: прогрес = записи лічильника від дня створення цілі.
+    addGoal("3 нові товари", 3, "шт", 1000, 0);
+    const lg = loadGoals()[0].id;
+    editGoal(lg, { title: "3 нові товари", target: 3, unit: "шт", xp: 1000, counterId: cid, big: true });
+    ok("ціль прив'язана", loadGoals()[0].counterId, cid);
+    ok("ціль позначена жирною", loadGoals()[0].big, true);
+    ok("прогрес підтягнувся від сьогоднішніх записів", goalProgress(loadGoals()[0]).cur, 2);
+    ok("ручних −/+ у прив'язаної немає",
+       document.querySelector('[data-goal="' + lg + '"] [data-gact="inc"]'), null);
+    setGoalProgress(lg, 0);
+    ok("ручна зміна прогресу прив'язаної — ігнорується", loadGoals()[0].current, 2);
+    bumpCounter(cid, "третій", false);
+    ok("третій запис закрив ціль", gDone(loadGoals()[0]), true);
+    ok("XP цілі нараховано разом із задачею", S().xp.total, 3 * getDif("d_hard").xp + 1000);
+    ok("віха з'явилась у лівій панелі", document.querySelector("#prog-list .mile .mile-t").textContent, "3 нові товари");
+    ok("віха з датою", document.querySelector("#prog-list .mile .mile-d").textContent, fmtDay(todayKey()));
+    // Симетрія: прибрали запис — ціль відкрилась, віха зникла.
+    // «−» звільнив №3, тож третій запис знову отримав №3 — номери без дірок.
+    ok("звільнений номер використано знову", Math.max(...loadTasks().map(x => x.seq | 0)), 3);
+    deleteTask(loadTasks().find(x => x.seq === 3).id);
+    ok("ціль відкрилась назад", gDone(loadGoals()[0]), false);
+    ok("віхи немає", document.querySelector("#prog-list .mile"), null);
+    ok("XP цілі знято", S().xp.total, 2 * getDif("d_hard").xp);
+    // Видалення лічильника задачі не чіпає, ціль відв'язується.
+    deleteCounter(cid);
+    ok("лічильника немає", loadCounters().length, 0);
+    ok("задачі лишились", loadTasks().length, 2);
+    sanitizeData();
+    ok("ціль відв'язано санітаром", loadGoals()[0].counterId, null);
+    ok("ключ лічильників у бекапі", BACKUP_KEYS.indexOf("workquest_counters_v1") >= 0, true);
+
     // 19. Копія в один файл (File System Access API).
     localStorage.clear();
     addDone("Задача для копії", activeDifs()[0].id);

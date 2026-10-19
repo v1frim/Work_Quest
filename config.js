@@ -352,6 +352,9 @@ const PLAN_ZONES = [            // від, до, відстань, довжин�
   { from: 17, to: 19, gap: 5,  len: 3,  w: 1.0, col: "#ff4b4b", ghost: true }
 ];
 
+/* Стандартні значки для нових лічильників активності. */
+const COUNTER_ICONS = ["📦", "🔎", "🎬", "📣", "🧾", "💬", "🧩", "⭐"];
+
 const WQ_TEXT = {
   appTitle:      "WORK QUEST",
   appSub:        "Закрий ще одну задачу",
