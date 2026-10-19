@@ -168,7 +168,8 @@ const METRICS = {
   /* — дні — */
   "days.active":           { label: "Днів активності",    icon: "📆", kind: "cumulative", color: "#87b4ff" },
   "days.calendar":         { label: "Днів від початку",   icon: "🗓", kind: "state" },
-  "days.planMet":          { label: "Днів із виконаним планом", icon: "🎯", kind: "cumulative", color: "#06d6a0" },
+  "days.planMet":          { label: "Днів із нормою",       icon: "🥇", kind: "cumulative", color: "#06d6a0" },
+  "days.minMet":           { label: "Днів із мінімумом",    icon: "✅", kind: "cumulative", color: "#7be07b" },
 
   /* — поточне — */
   "today.done":            { label: "Задач сьогодні",     icon: "☀️", kind: "periodic",   record: "best.dayDone" },
@@ -261,7 +262,7 @@ const ACHIEVEMENTS = [
   { id: "a_month",  icon: "🗓", title: "Місячна норма",   desc: "XP за календарний місяць",
     metric: "month.xp",        tiers: [20000, 50000, 100000, 150000, 200000, 250000] },
 
-  { id: "a_plan",   icon: "🎯", title: "За планом",       desc: "Днів, коли денний план виконано",
+  { id: "a_plan",   icon: "🥇", title: "За планом",       desc: "Днів із виконаною нормою (6 п.)",
     metric: "days.planMet",    tiers: [5, 20, 60, 150, 300, 600] },
 
   { id: "a_norma",  icon: "🥇", title: "Норма без пропусків", desc: "Днів поспіль із виконаною нормою",
@@ -300,7 +301,10 @@ const DEFAULT_PERIOD = "d30";
    «моя доба закінчується о 04:00»: задача о 02:00 пішла б у вчорашній день.
    ⚠️ Зміна вже НЕ перегрупує виконані задачі — у них doneDay заморожений.
    ─────────────────────────────────────────────────────────────────────────── */
-const DEFAULT_PLAN = { perDay: 4, perMonth: 80, topMark: 12, basis: "tasks", dayCutHour: 0 };
+// minPts/normaPts — планки дня в пунктах; стандарт дублює PLAN_MIN_POINTS /
+// PLAN_POINTS із розділу шкали нижче (той блок оголошений пізніше — TDZ).
+const DEFAULT_PLAN = { perDay: 4, perMonth: 80, topMark: 12, basis: "tasks", dayCutHour: 0,
+                       minPts: 2, normaPts: 6 };
 
 /* ───────────────────────────────────────────────────────────────────────────
    7. ДАТИ Й ЧИСЛІВНИКИ
@@ -332,6 +336,10 @@ const TRASH_MAX = 200;
    жовті; 7–8 вужчі, жовто-помаранчеві; 9–12 ще вужчі, помаранчеві;
    13–16 найдрібніші, червоні. */
 const PLAN_XP_PER_POINT = 500;
+/* ⚠️ Дві планки дня — ОБИДВІ в пунктах (рішення власника, сесія 4):
+   мінімум = 2 п. (~1 год), норма = 6 п. (~3 год). Це стандартні значення;
+   робочі лежать у плані користувача (minPts/normaPts, ⚙️ Налаштування). */
+const PLAN_MIN_POINTS = 2;
 const PLAN_POINTS = 6;
 const PLAN_MAX = 16, PLAN_TOP = 19;
 /* gap — відстань до попередньої поділки (px): догори поділки густішають.

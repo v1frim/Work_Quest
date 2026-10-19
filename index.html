@@ -259,6 +259,7 @@ h1 {
   padding: 6px 13px; font-size: 13px; color: var(--tx-1);
 }
 .chip b { color: var(--gold); font-weight: 700; }
+.chip.green { border-color: rgba(123,224,123,0.55); color: #c8f5c8; }
 .chip.gold { color: var(--gold); border-color: rgba(255,209,102,0.5); box-shadow: var(--sh-glow); }
 
 /* — XP-блок — */
@@ -1258,6 +1259,13 @@ function loadDifs() {
 }
 function saveDifs(a) { return saveJSON(K.difs, a); }
 function loadPlan() { return Object.assign({}, DEFAULT_PLAN, loadJSON(K.plan, {})); }
+// Планки дня в пунктах; пункт дня = floor(XP дня / PLAN_XP_PER_POINT).
+function planPts() {
+  const p = loadPlan();
+  const min = Math.max(1, p.minPts | 0), norma = Math.max(min, p.normaPts | 0);
+  return { min, norma };
+}
+const dayPoints = xp => Math.floor(Math.max(0, xp | 0) / PLAN_XP_PER_POINT);
 function savePlan(p) { return saveJSON(K.plan, p); }
 
 // Поліморфні читачі: зміна формату не потребує бампу версії ключа —
@@ -1662,12 +1670,14 @@ function computeStats() {
     }
   }
 
-  // Дві планки дня (задум користувача: «план мінімум і план норма»):
-  // мінімум = хоч один результат (це streak.current), норма = денний план.
-  const perDayN = Math.max(1, plan.perDay | 0);
+  // Дві планки дня (задум користувача: «план мінімум і план норма») —
+  // ОБИДВІ в пунктах XP дня (сесія 4): мінімум 2 п., норма 6 п.
+  // streak.current — активні дні (хоч якийсь результат), окремо від планок.
+  const PP = planPts();
+  const ptsOf = k => dayPoints((dayMap[k] || { xp: 0 }).xp);
   let normaBest = 0, nrun = 0, nprev = null;
   for (const k of keys) {
-    if (dayMap[k].done < perDayN) { nprev = null; continue; }
+    if (ptsOf(k) < PP.norma) { nprev = null; continue; }
     const n = dayNum(k);
     nrun = (nprev !== null && n - nprev === 1) ? nrun + 1 : 1;
     nprev = n;
@@ -1676,20 +1686,27 @@ function computeStats() {
   // Поточна серія норми — З ПІЛЬГОЮ на сьогодні: день ще триває, тож
   // невиконана поки норма серію не рве. Інакше щоранку показувало б нуль.
   let nStart = dayNum(today);
-  if (((dayMap[today] || { done: 0 }).done) < perDayN) nStart--;
+  if (ptsOf(today) < PP.norma) nStart--;
   let normaCur = 0;
   for (let n = nStart; ; n--) {
-    const r = dayMap[keyFromNum(n)];
-    if (r && r.done >= perDayN) normaCur++; else break;
+    if (ptsOf(keyFromNum(n)) >= PP.norma) normaCur++; else break;
+  }
+  // Серія мінімуму — так само, з пільгою на сьогодні.
+  let mStart = dayNum(today);
+  if (ptsOf(today) < PP.min) mStart--;
+  let minCur = 0;
+  for (let n = mStart; ; n--) {
+    if (ptsOf(keyFromNum(n)) >= PP.min) minCur++; else break;
   }
 
   // Рекорди днів
-  let bDone = 0, bDoneAt = null, bXp = 0, bXpAt = null, planMet = 0;
+  let bDone = 0, bDoneAt = null, bXp = 0, bXpAt = null, planMet = 0, minMet = 0;
   for (const k of keys) {
     const r = dayMap[k];
     if (r.done > bDone) { bDone = r.done; bDoneAt = k; }
     if (r.xp > bXp) { bXp = r.xp; bXpAt = k; }
-    if (r.done >= (plan.perDay | 0)) planMet++;
+    if (ptsOf(k) >= PP.norma) planMet++;
+    if (ptsOf(k) >= PP.min) minMet++;
     weekdaySum[parseKey(k).getDay()] += r.done;
   }
 
@@ -1764,14 +1781,14 @@ function computeStats() {
     tasks: { done, open, total: tasks.length, doneByDiff, openByDiff: {}, doneByTag },
     goals: { done: goalsDone, open: goalsOpen, total: goals.length },
     xp: { total: xpTotal, byDiff: xpByDiff },
-    days: { active: activeDays, calendar: calDays, first, last, planMet },
+    days: { active: activeDays, calendar: calDays, first, last, planMet, minMet },
     today: { done: t0.done, xp: t0.xp, goals: t0.goals, steps: t0.steps },
     steps: { done: stepsDone, xp: stepsXpTotal },
     yesterday: { done: y0.done },
     week: { done: wNow.done, xp: wNow.xp },
     month: { done: mNow.done, xp: mNow.xp, daysPassed: +today.slice(8, 10) },
     streak: { current: cur, best: bestStreak, bestEnd, atRisk: t0.done === 0 && y0.done > 0,
-              norma: normaCur, normaBest },
+              norma: normaCur, normaBest, min: minCur },
     best: {
       dayDone: bDone, dayDoneAt: bDoneAt, dayXp: bXp, dayXpAt: bXpAt,
       dayXpFair: bXpFair, dayXpFairAt: bXpFairAt,
@@ -1788,13 +1805,10 @@ function computeStats() {
     // Пункти шкали «ПЛАНИ»: 1 пункт = PLAN_XP_PER_POINT XP дня. Середнє —
     // по АКТИВНИХ днях (день без жодного XP не тягне середнє вниз).
     points: (function () {
-      let sum = 0, n = 0, planDays = 0;
-      for (const k of keys) {
-        const pts = Math.floor(dayMap[k].xp / PLAN_XP_PER_POINT);
-        sum += pts; n++;
-        if (pts >= PLAN_POINTS) planDays++;
-      }
-      return { avgActive: n ? sum / n : 0, planDays, today: Math.floor(t0.xp / PLAN_XP_PER_POINT) };
+      let sum = 0, n = 0;
+      for (const k of keys) { sum += ptsOf(k); n++; }
+      return { avgActive: n ? sum / n : 0, planDays: planMet, minDays: minMet,
+               today: dayPoints(t0.xp), min: PP.min, norma: PP.norma };
     })(),
     weekday: { avgDone: weekdayAvg, best: { idx: wdBest, name: wdBest >= 0 ? WEEKDAY_NAMES[wdBest] : "—", avg: wdBestV } },
     hours: { early, late },
@@ -2766,10 +2780,11 @@ function planScaleHtml(dayXp) {
          (pts > 0 ? bz : "#7d859b"), '">', pts, '</text></svg>');
 
   const z = pts ? planZone(pts) : PLAN_ZONES[0];
-  const left = Math.max(0, PLAN_POINTS - pts);
+  const NORMA = planPts().norma;
+  const left = Math.max(0, NORMA - pts);
   const foot = left ? ['до плану <b>', left, '</b>'].join("")
     : pts >= PLAN_MAX ? ['<b style="color:', zMax.col, '">МАКС</b>'].join("")
-    : pts > PLAN_POINTS ? ['понад план <b style="color:', z.col, '">+', pts - PLAN_POINTS, '</b>'].join("")
+    : pts > NORMA ? ['понад план <b style="color:', z.col, '">+', pts - NORMA, '</b>'].join("")
     : ['<b style="color:', PLAN_ZONES[0].col, '">план ✓</b>'].join("");
   // XP дня під підписом — як на макетах: видно, скільки бракує до наступного пункту.
   return ['<div class="th-cap">ПЛАНИ</div>', h.join(""), '<div class="th-foot">', foot, '</div>',
@@ -2780,15 +2795,18 @@ function renderToday() {
   const s = S();
   // ⚠️ Збірка ТІЛЬКИ масивом і .join(""). Ланцюжок через '+' ламається від
   // коментаря в кінці рядка: '+' з'їдається, і половина панелі тихо зникає.
-  const perDay = Math.max(1, s.plan.perDay | 0);
-  const normaMet = s.today.done >= perDay;
+  // Планки дня — в пунктах (1 п. = 500 XP), ті самі, що й на шкалі зліва.
+  const pt = s.points, minMet = pt.today >= pt.min, normaMet = pt.today >= pt.norma;
   const h = [
     '<span class="chip">Сьогодні: <b>', s.today.done, '</b> ',
     plural(s.today.done, "задача", "задачі", "задач"), '</span>',
     '<span class="chip"><b>', fmtXpNum(s.today.xp), '</b> XP</span>',
     '<span class="chip">🔥 серія <b>', s.streak.current, '</b></span>',
-    '<span class="chip', (normaMet ? ' gold' : ''), '" title="Денна норма — план задач на день (⚙️)">🥇 норма <b>',
-    s.today.done, '</b>/', perDay,
+    '<span class="chip', (minMet ? ' green' : ''), '" title="Мінімум дня — ', pt.min, ' п. (⚙️)">✅ мінімум <b>',
+    Math.min(pt.today, pt.min), '</b>/', pt.min,
+    (s.streak.min > 1 ? ' · ' + s.streak.min + ' дн.' : ''), '</span>',
+    '<span class="chip', (normaMet ? ' gold' : ''), '" title="Норма дня — ', pt.norma, ' п. (⚙️)">🥇 норма <b>',
+    Math.min(pt.today, pt.norma), '</b>/', pt.norma,
     (s.streak.norma > 1 ? ' · ' + s.streak.norma + ' дн.' : ''), '</span>'
   ];
   $("today-row").innerHTML = h.join("");
@@ -2829,13 +2847,15 @@ function renderTotals() {
   }
   if (s.goals.done) row("🎯", "Цілей досягнуто", s.goals.done);
   row("⚡", "Усього XP", fmtXpNum(s.xp.total));
-  row("📆", "Днів активності", s.days.active);
+  row("🗓", "Днів від початку", s.days.calendar);
+  row("📆", "Активних днів", s.days.active);
+  row("✅", "Днів із мінімумом " + s.points.min + " п.", s.days.minMet);
   row("🔥", "Поточна серія", s.streak.current);
   row("🏅", "Найдовша серія", s.streak.best);
   row("📊", "Сер. задач/день", s.avg.donePerCalendarDay.toFixed(1));
   row("📊", "Сер. задач/місяць", s.avg.donePerMonth.toFixed(1));
   row("🌡", "Сер. пунктів/акт. день", s.points.avgActive.toFixed(1));
-  row("🎯", "Днів із планом " + PLAN_POINTS + " п.", s.points.planDays);
+  row("🥇", "Днів із нормою " + s.points.norma + " п.", s.points.planDays);
   row("🗓", "Найкращий день тижня", s.weekday.best.idx >= 0 ? WEEKDAY_SHORT[s.weekday.best.idx] : "—");
   $("tot-list").innerHTML = h.join("");
 }
@@ -2903,12 +2923,12 @@ function renderDays() {
     return m;
   };
 
-  const perDay = Math.max(1, s.plan.perDay | 0);
   const h = [];
   for (const k of recent) {
     const r = s.dayMap[k];
-    // Медаль дня: 🥇 норма виконана, ✅ мінімум (хоч один результат).
-    const med = r.done >= perDay ? "🥇" : (r.done ? "✅" : "");
+    // Медаль дня — за пунктами: 🥇 норма, ✅ мінімум, без медалі — активний, але нижче мінімуму.
+    const pts = dayPoints(r.xp);
+    const med = pts >= s.points.norma ? "🥇" : (pts >= s.points.min ? "✅" : "");
     h.push(progRow(fmtDay(k), r, k === today, [k], med));
   }
 
@@ -3357,8 +3377,11 @@ function renderSettings() {
   h.push('<button class="mini" id="dif-add">+ додати складність</button></div>');
 
   h.push('<div class="set-block"><div class="set-sect">Плани</div>',
-    '<div class="row2"><span style="flex:0 0 150px">Задач на день</span>',
-    '<input class="fld" id="p-day" type="number" min="1" step="1" value="', plan.perDay | 0, '"></div>',
+    '<div class="set-note">Планки дня — в пунктах шкали зліва: 1 пункт = ', PLAN_XP_PER_POINT, ' XP (~30 хв роботи).</div>',
+    '<div class="row2"><span style="flex:0 0 150px">Мінімум, пунктів</span>',
+    '<input class="fld" id="p-min" type="number" min="1" step="1" value="', plan.minPts | 0, '"></div>',
+    '<div class="row2"><span style="flex:0 0 150px">Норма, пунктів</span>',
+    '<input class="fld" id="p-norma" type="number" min="1" step="1" value="', plan.normaPts | 0, '"></div>',
     '<div class="row2"><span style="flex:0 0 150px">Задач на місяць</span>',
     '<input class="fld" id="p-month" type="number" min="1" step="1" value="', plan.perMonth | 0, '"></div>',
     '</div>');
@@ -3952,9 +3975,10 @@ $("set-body").addEventListener("change", e => {
     renderSettings();
     return;
   }
-  if (e.target.id === "p-day" || e.target.id === "p-month") {
+  if (e.target.id === "p-min" || e.target.id === "p-norma" || e.target.id === "p-month") {
     const plan = loadPlan();
-    plan.perDay = Math.max(1, +$("p-day").value | 0);
+    plan.minPts = Math.max(1, +$("p-min").value | 0);
+    plan.normaPts = Math.max(plan.minPts, +$("p-norma").value | 0);   // норма не нижча за мінімум
     plan.perMonth = Math.max(1, +$("p-month").value | 0);
     savePlan(plan);
     commit();

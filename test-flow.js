@@ -266,22 +266,38 @@ const SCRIPT = `(async function () {
     runMigrations();
     ok("повторний сід не дублює", loadGoals().length, 3);
 
-    // 13. Норма дня (план мінімум/норма): 4 задачі при плані 4 = норма.
+    // 13. Планки дня в ПУНКТАХ (1 п. = 500 XP): мінімум 2 п., норма 6 п.
     localStorage.clear();
-    for (let i = 0; i < 4; i++) addDone("Норма " + i, d.id);
-    ok("норму виконано", S().today.done, 4);
-    ok("серія норми = 1", S().streak.norma, 1);
+    addDone("Звичайна", "d_normal");                       // 500 XP = 1 п.
+    ok("1 п. — мінімуму ще немає", S().streak.min, 0);
+    ok("активний день — серія активності є", S().streak.current, 1);
+    addDone("Звичайна 2", "d_normal");                     // 2 п.
+    ok("2 п. — мінімум узято", S().streak.min, 1);
+    ok("днів із мінімумом", S().days.minMet, 1);
+    ok("норми ще немає", S().streak.norma, 0);
+    addDone("Складна", "d_hard"); addDone("Звичайна 3", "d_normal");   // 3250 = 6 п.
+    ok("6 п. — норму виконано", S().streak.norma, 1);
     ok("найкраща серія норми = 1", S().streak.normaBest, 1);
+    ok("днів із нормою", S().days.planMet, 1);
+    ok("медаль дня — 🥇", document.querySelector("#prog-list .prog-med").textContent, "🥇");
+    ok("чип норми золотий", document.querySelector("#today-row .chip.gold") !== null, true);
+    ok("чип мінімуму зелений", document.querySelector("#today-row .chip.green") !== null, true);
 
     // Пільга на сьогодні: вчора норма є, сьогодні ще в процесі — серія жива.
     localStorage.clear();
     const yk = keyFromNum(dayNum(todayKey()) - 1);
     const TY = [];
-    for (let i = 0; i < 4; i++) TY.push({ id: "ty" + i, title: "вчора", note: "",
-      difficultyId: d.id, tags: [], createdAt: 1, doneAt: 2, doneDay: yk, xpAwarded: 5, difSnap: null });
+    for (let i = 0; i < 2; i++) TY.push({ id: "ty" + i, title: "вчора", note: "",
+      difficultyId: "d_hard", tags: [], createdAt: 1, doneAt: 2, doneDay: yk, xpAwarded: 1750, difSnap: null });
     localStorage.setItem("workquest_tasks_v1", JSON.stringify(TY));
     bumpStats();
     ok("пільга: серія норми жива зранку", S().streak.norma, 1);
+    ok("пільга: серія мінімуму жива зранку", S().streak.min, 1);
+    // Планки — налаштовувані (⚙️).
+    savePlan(Object.assign(loadPlan(), { minPts: 1, normaPts: 3 })); bumpStats();
+    ok("норма 3 п. з налаштувань", S().points.norma, 3);
+    ok("вчорашні 7 п. ≥ 3 — серія норми", S().streak.norma, 1);
+    savePlan(Object.assign(loadPlan(), { minPts: 2, normaPts: 6 })); bumpStats();
     ok("мінімум-серія сьогодні ще 0", S().streak.current, 0);
 
     // 14. Редагування на місці.
@@ -994,7 +1010,8 @@ const SCRIPT = `(async function () {
     ok("пунктів сьогодні (без стелі шкали)", S().points.today, 23);
     ok("днів із планом", S().points.planDays, 1);
     ok("середнє по активних днях", S().points.avgActive, 23);
-    ok("рядок у статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із планом 6 п.") >= 0, true);
+    ok("рядок у статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із нормою 6 п.") >= 0, true);
+    ok("рядок мінімуму в статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із мінімумом 2 п.") >= 0, true);
     // Підписи статистики — в одну лінію: колонка значків фіксованої ширини.
     const lx = [...document.querySelectorAll("#tot-list .tot-r .l")].map(e => Math.round(e.getBoundingClientRect().left));
     ok("підписи статистики вирівняні", new Set(lx).size, 1);
