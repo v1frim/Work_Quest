@@ -518,8 +518,10 @@ h1 {
 .sec-h .add:hover { background: var(--solid-btn-hov); }
 
 /* — лічильники активності — */
-#cnt-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 14px; }
+#cnt-block { flex: 0 0 auto; margin-top: 12px; padding-top: 10px; border-top: var(--bd-row); }
+#cnt-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
 #cnt-list.hidden { display: none; }
+#cnt-h.hidden { display: none; }
 .cnt {
   padding: 8px 10px 7px; border-radius: var(--r-btn);
   background: linear-gradient(0deg, var(--c-t), var(--c-t)), var(--solid-btn);
@@ -532,7 +534,7 @@ h1 {
 .cnt-sub { font-size: 10.5px; color: var(--tx-5); margin-top: 1px; }
 .cnt-ctl { display: flex; gap: 4px; margin-top: 6px; }
 .cnt-ctl .mini { flex: 1 1 auto; padding: 3px 0; text-align: center; }
-.cnt-ctl .mini.go { flex: 2 1 auto; color: var(--c); border-color: var(--c-b); font-weight: 700; }
+.cnt-ctl .mini.go { flex: 1 1 auto; color: var(--c); border-color: var(--c-b); font-weight: 700; }
 .cnt.draft .fld { width: 100%; box-sizing: border-box; margin-top: 6px; font-size: 12px; padding: 4px 8px; }
 /* Віхи — хронологія «жирних» цілей у лівій панелі */
 .mile { display: flex; align-items: baseline; gap: 8px; padding: 4px 2px; font-size: 13px; }
@@ -839,6 +841,11 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
     <div class="panel-h">📈 Прогрес по днях</div>
     <div class="panel-sub">Складності і XP за день · ✅ мінімум · 🥇 норма</div>
     <div class="scroll-wrap"><div class="scroll" id="prog-list"></div></div>
+    <!-- Лічильники — внизу лівої панелі (рішення власника: там є місце) -->
+    <div id="cnt-block">
+      <div class="sec-h" id="cnt-h">АКТИВНІСТЬ<button class="add" id="cnt-add" title="Лічильники — у ⚙️ Налаштуваннях">+ лічильник</button></div>
+      <div id="cnt-list"></div>
+    </div>
   </aside>
 
   <!-- ЦЕНТР -->
@@ -873,8 +880,6 @@ textarea.fld { resize: vertical; line-height: 1.5; font-family: inherit; }
     <div class="panel-h">🎯 Цілі та задачі</div>
     <div class="panel-sub">Довгі цілі з прогресом і те, що зараз у роботі</div>
     <div class="scroll-wrap"><div class="scroll">
-      <div class="sec-h" id="cnt-h">АКТИВНІСТЬ<button class="add" id="cnt-add" title="Лічильники створюються в ⚙️ Налаштуваннях">+ лічильник</button></div>
-      <div id="cnt-list"></div>
       <div class="sec-h">ЦІЛІ<button class="add" id="goal-add">+ ціль</button></div>
       <div id="goal-list"></div>
       <div class="sec-h" id="open-h">У РОБОТІ<button class="add" id="task-add">+ задача</button></div>
@@ -1468,6 +1473,18 @@ const MIGRATIONS = {
   // ⚠️ Виконаних задач НЕ чіпає: нова ціна діє лише на майбутні виконання.
   // Деномінація історії була одноразовою (міграція 4), і нова — лише з
   // прямого «так» власника.
+  // 6 — вбудований лічильник «Новий товар» (сесія 4): власник на момент
+  // появи лічильників уже додав 6 товарів — зараховуємо їх як base, щоб
+  // наступний у задачах ішов «+1 (7) …». Ідемпотентно: base ставиться лише
+  // якщо його ще немає.
+  6: function seedProductCounter() {
+    const cs = loadCounters();
+    let c = cs.find(x => x.id === BUILTIN_COUNTER.id);
+    if (!c) { c = Object.assign({}, BUILTIN_COUNTER, { order: 0, createdAt: Date.now() }); cs.unshift(c); }
+    c.builtin = true;
+    if (!(c.base > 0)) c.base = 6;
+    saveCounters(cs);
+  },
   5: function retimeHardHeavyEpic() {
     const stored = loadJSON(K.difs, null);
     if (!Array.isArray(stored) || !stored.length) return;
@@ -1587,7 +1604,10 @@ function sanitizeData() {
   }
   // Лічильники: id, назва, складність (неіснуюча → перша активна).
   const cs = loadCounters(); let cf = 0;
+  if (!cs.some(c => c.id === BUILTIN_COUNTER.id)) { cs.unshift(Object.assign({}, BUILTIN_COUNTER, { order: 0, createdAt: Date.now() })); cf++; }
   for (const c of cs) {
+    if (c.id === BUILTIN_COUNTER.id && !c.builtin) { c.builtin = true; cf++; }
+    if (typeof c.base !== "number") { c.base = 0; cf++; }
     if (!c.id) { c.id = rid("c_"); cf++; }
     if (typeof c.order !== "number") { c.order = cs.indexOf(c) + 1; cf++; }
     if (!loadDifs().some(d => d.id === c.difficultyId)) { c.difficultyId = (activeDifs()[0] || {}).id || null; cf++; }
@@ -1986,23 +2006,29 @@ function syncLinkedStep(t, done) {
 /* Наступний номер лічильника — максимум серед УСІХ його задач (і відкритих,
    і виконаних) + 1: винесена в роботу «№7» уже зайняла свій номер. */
 function nextSeq(counterId) {
-  return loadTasks().reduce((n, t) => (t.counterId === counterId ? Math.max(n, t.seq | 0) : n), 0) + 1;
+  const c = loadCounters().find(x => x.id === counterId);
+  return loadTasks().reduce((n, t) => (t.counterId === counterId ? Math.max(n, t.seq | 0) : n), c ? (c.base | 0) : 0) + 1;
 }
+// Формат назви — як власник пише вручну: «+1 (7) Новий товар (уточнення)».
 function counterTitle(c, seq, note) {
   const n = String(note || "").trim();
-  return (c.name + " №" + seq + (n ? " (" + n + ")" : "")).slice(0, 200);
+  return ("+1 (" + seq + ") " + c.name + (n ? " (" + n + ")" : "")).slice(0, 200);
 }
 // Скільки лічильник набрав: виконані задачі з його id, за бажанням — від дня.
+// base (зроблене до трекера) додається лише до загального числа, не до цілей.
 function counterCount(counterId, sinceDay) {
   return loadTasks().filter(t => t.counterId === counterId && tDone(t) &&
     (!sinceDay || (t.doneDay && t.doneDay >= sinceDay))).length;
 }
-// «+1»: виконана задача одразу; «↗»: відкрита, в «У роботі» (номер зайнято).
-function bumpCounter(counterId, note, asOpen) {
+function counterTotal(c) { return (c.base | 0) + counterCount(c.id); }
+/* «↗»: наступний номер — відкритою задачею в «У роботі». ⚠️ Лічильник
+   НІЧОГО не виконує сам (рішення власника): зараховується лише те, що
+   закрито в задачах, тож він — для звірки прогресу й швидкого додавання. */
+function bumpCounter(counterId, note) {
   const c = loadCounters().find(x => x.id === counterId);
   if (!c) return false;
   const seq = nextSeq(counterId), title = counterTitle(c, seq, note);
-  const ok = asOpen ? addOpen(title, c.difficultyId) : addDone(title, c.difficultyId);
+  const ok = addOpen(title, c.difficultyId);
   if (!ok) return false;
   const tasks = loadTasks(); const t = tasks[tasks.length - 1];
   t.counterId = counterId; t.seq = seq;
@@ -2026,12 +2052,13 @@ function editCounter(id, patch) {
   if (patch.icon != null) c.icon = String(patch.icon).slice(0, 4) || c.icon;
   if (patch.unit != null) c.unit = String(patch.unit).slice(0, 12);
   if (patch.difficultyId && activeDifs().some(d => d.id === patch.difficultyId)) c.difficultyId = patch.difficultyId;
+  if (patch.base != null) c.base = Math.max(0, +patch.base | 0);
   saveCounters(cs); commit(); return true;
 }
 // Видалення лічильника задач не чіпає: вони лишаються в історії як звичайні.
 function deleteCounter(id) {
   const cs = loadCounters(); const i = cs.findIndex(x => x.id === id);
-  if (i < 0) return false;
+  if (i < 0 || cs[i].builtin) return false;      // вбудований не видаляється
   const n = counterCount(id);
   if (!confirm("Видалити лічильник «" + cs[i].name + "»?" + (n ? " Його " + n + " " + plural(n, "задача", "задачі", "задач") + " лишаться в історії." : ""))) return false;
   cs.splice(i, 1); saveCounters(cs); commit(); return true;
@@ -3273,30 +3300,28 @@ function renderCounters() {
   const cs = loadCounters().slice().sort((a, b) => (a.order | 0) - (b.order | 0));
   const list = $("cnt-list");
   list.classList.toggle("hidden", !cs.length);
-  $("cnt-h").classList.toggle("hidden", !cs.length && !_cntDraft);
+  $("cnt-h").classList.toggle("hidden", !cs.length);
   const tasks = loadTasks();
   const h = [];
   for (const c of cs) {
     const d = getDif(c.difficultyId);
     const mine = tasks.filter(t => t.counterId === c.id);
-    const done = mine.filter(tDone).length, openN = mine.length - done;
+    const done = counterTotal(c), openN = mine.filter(t => !tDone(t)).length;
     const st = ["--c:", d.color, ";--c-t:", hexToRgba(d.color, 0.10), ";--c-b:", hexToRgba(d.color, 0.34)].join("");
     const dr = _cntDraft && _cntDraft.id === c.id;
     h.push('<div class="cnt', (dr ? ' draft' : ''), '" style="', st, '" data-cnt="', escAttr(c.id), '">',
       '<div class="cnt-top"><span class="cnt-ic">', esc(c.icon), '</span><span class="cnt-n">', esc(c.name), '</span>',
-      '<span class="cnt-v" title="Виконано всього">', done, '</span></div>',
+      '<span class="cnt-v" title="', escAttr("Зроблено всього" + (c.base ? " (із них " + c.base + " до трекера)" : "")), '">', done, '</span></div>',
       '<div class="cnt-sub">', esc(d.icon + " " + d.name), ' · +', fmtXpNum(d.xp), ' XP/', esc(c.unit || "шт"),
       (openN ? ' · <b>' + openN + '</b> у роботі' : ''), '</div>');
     if (dr) {
-      h.push('<input class="fld" id="cnt-draft-input" placeholder="уточнення (необов\'язково)" maxlength="120" value="', escAttr(_cntDraft.note || ""), '">',
+      h.push('<input class="fld" id="cnt-draft-input" placeholder="назва товару" maxlength="120" value="', escAttr(_cntDraft.note || ""), '">',
         '<div class="cnt-sub">буде: <b>', esc(counterTitle(c, nextSeq(c.id), _cntDraft.note)), '</b></div>',
-        '<div class="cnt-ctl"><button class="mini go" data-cact="commit">', (_cntDraft.asOpen ? '↗ у роботу' : '✓ записати'), '</button>',
+        '<div class="cnt-ctl"><button class="mini go" data-cact="commit">↗ у задачі</button>',
         '<button class="mini" data-cact="cancel">✕</button></div>');
     } else {
       h.push('<div class="cnt-ctl">',
-        '<button class="mini" data-cact="undo" title="Прибрати останній запис (у кошик)">−</button>',
-        '<button class="mini" data-cact="open" title="Наступний — у «У роботі», номер підбереться сам">↗</button>',
-        '<button class="mini go" data-cact="plus" title="Записати виконаним зараз">+1</button>',
+        '<button class="mini go" data-cact="open" title="Наступний номер — відкритою задачею в «У роботі»">↗ +1 (', nextSeq(c.id), ') у задачі</button>',
         '</div>');
     }
     h.push('</div>');
@@ -3565,7 +3590,7 @@ function renderSettings() {
   h.push('<button class="mini" id="dif-add">+ додати складність</button></div>');
 
   h.push('<div class="set-block"><div class="set-sect">Лічильники активності</div>',
-    '<div class="set-note">Повторювані дії зі своєю складністю: «+1» у правій панелі записує виконану задачу з номером («Новий товар №7»), «↗» кладе наступний номер у «У роботі». Ціль можна прив\'язати до лічильника через ✎ — тоді її прогрес рахується сам.</div>');
+    '<div class="set-note">Лічильник — для звірки прогресу й швидкого додавання: «↗» кладе наступний номер у «У роботі» («+1 (7) Новий товар (назва)»), а зараховується лише те, що закрито в задачах. «Вже є» — скільки зроблено до трекера. Ціль можна прив\'язати до лічильника через ✎.</div>');
   const cnts = loadCounters().sort((a, b) => (a.order | 0) - (b.order | 0));
   for (const c of cnts) {
     h.push('<div class="dif-edit" data-cnt="', escAttr(c.id), '" style="--c-b:', hexToRgba(getDif(c.difficultyId).color, 0.34), '">',
@@ -3576,7 +3601,10 @@ function renderSettings() {
       activeDifs().map(d => '<option value="' + escAttr(d.id) + '"' + (d.id === c.difficultyId ? ' selected' : '') + '>' +
         esc(d.icon + " " + d.name + " +" + fmtXpNum(d.xp)) + '</option>').join(""),
       '</select>',
-      '<button class="mini dz" data-cact="del" title="Видалити лічильник">🗑</button></div>');
+      '<input class="fld" data-cset="base" type="number" min="0" step="1" value="', c.base | 0, '" style="width:64px" title="Вже є (зроблено до трекера)">',
+      (c.builtin ? '<span class="mini" title="Вбудований лічильник — не видаляється">🔒</span>'
+                 : '<button class="mini dz" data-cact="del" title="Видалити лічильник">🗑</button>'),
+      '</div>');
   }
   h.push('<button class="mini" id="cnt-new">+ додати лічильник</button></div>');
 
@@ -3811,20 +3839,15 @@ $("cnt-list").addEventListener("click", e => {
   const btn = e.target.closest("[data-cact]");
   if (!box || !btn) return;
   const id = box.dataset.cnt, act = btn.dataset.cact;
-  if (act === "plus" || act === "open") {
-    _cntDraft = { id, asOpen: act === "open", note: "" };
+  if (act === "open") {
+    _cntDraft = { id, note: "" };
     refresh("counters");
     const i = $("cnt-draft-input"); if (i) i.focus();
   } else if (act === "commit") {
     const i = $("cnt-draft-input");
     const d = _cntDraft; _cntDraft = null;
-    if (d) bumpCounter(d.id, i ? i.value : "", d.asOpen); else refresh("counters");
+    if (d) bumpCounter(d.id, i ? i.value : ""); else refresh("counters");
   } else if (act === "cancel") { _cntDraft = null; refresh("counters"); }
-  else if (act === "undo") {
-    // Останній запис лічильника — у кошик (через звичайне підтвердження).
-    const last = loadTasks().filter(t => t.counterId === id).sort((a, b) => (b.seq | 0) - (a.seq | 0))[0];
-    if (last) deleteTask(last.id);
-  }
 });
 $("cnt-list").addEventListener("input", e => {
   if (e.target.id === "cnt-draft-input" && _cntDraft) {
