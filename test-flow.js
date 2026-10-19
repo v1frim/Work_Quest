@@ -1010,8 +1010,9 @@ const SCRIPT = `(async function () {
     ok("пунктів сьогодні (без стелі шкали)", S().points.today, 23);
     ok("днів із планом", S().points.planDays, 1);
     ok("середнє по активних днях", S().points.avgActive, 23);
-    ok("рядок у статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із нормою 6 п.") >= 0, true);
-    ok("рядок мінімуму в статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із мінімумом 2 п.") >= 0, true);
+    ok("рядок у статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із нормою") >= 0, true);
+    ok("рядок мінімуму в статистиці", document.getElementById("tot-list").textContent.indexOf("Днів із мінімумом") >= 0, true);
+    ok("«Поточної серії» в статистиці немає", document.getElementById("tot-list").textContent.indexOf("Поточна серія"), -1);
     // Підписи статистики — в одну лінію: колонка значків фіксованої ширини.
     const lx = [...document.querySelectorAll("#tot-list .tot-r .l")].map(e => Math.round(e.getBoundingClientRect().left));
     ok("підписи статистики вирівняні", new Set(lx).size, 1);
@@ -1036,7 +1037,7 @@ const SCRIPT = `(async function () {
     ci.value = "тактична аптечка";
     document.querySelector('[data-cnt="' + bc.id + '"] [data-cact="commit"]').click();
     const ct = loadTasks()[0];
-    ok("назва у форматі власника", ct.title, "+1 (7) Новий товар (тактична аптечка)");
+    ok("назва у форматі власника — товар у лапках", ct.title, "+1 (7) Новий товар «тактична аптечка»");
     ok("задача ВІДКРИТА, не виконана", tDone(ct), false);
     ok("XP не нарахований", S().xp.total, 0);
     const bcTot = () => counterTotal(loadCounters().find(c => c.builtin));   // base читається свіжим

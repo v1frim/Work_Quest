@@ -2012,7 +2012,7 @@ function nextSeq(counterId) {
 // Формат назви — як власник пише вручну: «+1 (7) Новий товар (уточнення)».
 function counterTitle(c, seq, note) {
   const n = String(note || "").trim();
-  return ("+1 (" + seq + ") " + c.name + (n ? " (" + n + ")" : "")).slice(0, 200);
+  return ("+1 (" + seq + ") " + c.name + (n ? " «" + n + "»" : "")).slice(0, 200);
 }
 // Скільки лічильник набрав: виконані задачі з його id, за бажанням — від дня.
 // base (зроблене до трекера) додається лише до загального числа, не до цілей.
@@ -3001,13 +3001,12 @@ function renderTotals() {
   row("⚡", "Усього XP", fmtXpNum(s.xp.total));
   row("🗓", "Днів від початку", s.days.calendar);
   row("📆", "Активних днів", s.days.active);
-  row("✅", "Днів із мінімумом " + s.points.min + " п.", s.days.minMet);
-  row("🔥", "Поточна серія", s.streak.current);
+  row("✅", "Днів із мінімумом", s.days.minMet);
+  row("🥇", "Днів із нормою", s.points.planDays);
   row("🏅", "Найдовша серія", s.streak.best);
   row("📊", "Сер. задач/день", s.avg.donePerCalendarDay.toFixed(1));
   row("📊", "Сер. задач/місяць", s.avg.donePerMonth.toFixed(1));
   row("🌡", "Сер. пунктів/акт. день", s.points.avgActive.toFixed(1));
-  row("🥇", "Днів із нормою " + s.points.norma + " п.", s.points.planDays);
   row("🗓", "Найкращий день тижня", s.weekday.best.idx >= 0 ? WEEKDAY_SHORT[s.weekday.best.idx] : "—");
   $("tot-list").innerHTML = h.join("");
 }
