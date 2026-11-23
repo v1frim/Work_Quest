@@ -2689,13 +2689,17 @@ async function writeToHandle(handle) {
 /* Автокопія раз на добу. Викликається на старті; жодних діалогів — якщо
    дозволу вже немає або файл не обрано, тихо виходить. Питати дозвіл без
    кліку користувача браузер усе одно не дасть. */
+let backupNeedsClick = false;
 async function autoBackup() {
   if (!hasFSA) return;
   if (lsGet(K.backupAt, "") === todayKey()) return;
   try {
     const handle = await idbGet("fileHandle");
     if (!handle) return;
-    if ((await handle.queryPermission(RW)) !== "granted") return;
+    // ⚠️ (23.11.2026, скарга «перестало зберігати») Chrome СКИДАЄ дозвіл на файл після
+    // перезапуску/оновлення браузера (якщо не обрано «Дозволяти під час кожного відвідування»).
+    // Без кліку requestPermission не можна — тож лише підказуємо на кнопці, що треба натиснути.
+    if ((await handle.queryPermission(RW)) !== "granted") { backupNeedsClick = true; renderBackupBtn(); return; }
     await writeToHandle(handle);
     toast("💾 Автокопія збережена");
   } catch (e) { console.warn("[backup] автокопія не вдалась", e); }
@@ -2713,37 +2717,61 @@ function downloadJSON(name, text) {
 }
 
 /* Клік по «Копії». Перший раз питає, куди зберегти; далі мовчки перезаписує
-   той самий файл. ⚠️ Скасований діалог — не помилка: користувач передумав,
-   і застосунок має просто нічого не зробити. */
-async function doBackup() {
-  if (!hasFSA) {
-    // Фолбек лишає дату в імені: у теці «Завантаження» файл не перезаписується,
-    // тож без дати там утворилася б купа backup(1).json, backup(2).json.
-    downloadJSON("workquest_backup_" + todayKey() + ".json", getBackupData());
-    lsSet(K.backupAt, todayKey());
-    refresh("backup");
-    toast("💾 Копію збережено");
+   той самий файл. ⚠️ Скасований діалог — не помилка: користувач передумав.
+   ⚠️ (23.11.2026, «тисну — і нічого») — крок requestPermission / createWritable ЗАВИСАВ
+   або падав, а catch мовчки все ковтав. Тепер (як в Oxford_1000):
+   • кожен крок — статус на кнопці («⏳ дозвіл…», «⏳ запис…») і тайм-аут;
+   • будь-який збій → копія СКАЧУЄТЬСЯ звичайним файлом + alert із причиною,
+     збережений файл забуваємо — наступний клік знову запропонує вибрати файл;
+   • Shift+клік — одразу вибір нового файлу. */
+function backupDownload() {
+  downloadJSON("workquest_backup_" + todayKey() + ".json", getBackupData());
+  lsSet(K.backupAt, todayKey());
+  backupNeedsClick = false;
+  refresh("backup");
+}
+function backupStep(label, promise, ms) {
+  $("backup-btn").textContent = "⏳ " + label + "…";
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => {
+    const e = new Error("крок «" + label + "» не відповів за " + Math.round((ms || 8000) / 1000) + " с");
+    e.name = "Timeout"; rej(e);
+  }, ms || 8000))]);
+}
+async function doBackup(ev) {
+  if (!hasFSA) { backupDownload(); toast("💾 Копію збережено"); return; }
+  const fallback = async why => {
+    try { await idbSet("fileHandle", null); } catch (e) { console.warn("[backup] не вдалось забути файл", e); }
+    backupDownload();
+    alert("Не вдалось записати у файл копії: " + why + ".\n\nКопію СКАЧАНО звичайним файлом (папка «Завантаження»).\n" +
+      "Наступного разу натисни кнопку ще раз — відкриється вибір файлу, куди писати копію автоматично.");
+  };
+  let handle = null;
+  if (!(ev && ev.shiftKey)) {
+    try { handle = await backupStep("файл копії", idbGet("fileHandle"), 4000); } catch (e) { handle = null; }
+  }
+  if (handle) {
+    let perm;
+    try { perm = await backupStep("дозвіл", handle.requestPermission(RW), 15000); }
+    catch (e) { await fallback(e.name + ": " + e.message); return; }
+    if (perm !== "granted") { await fallback("браузер не дав дозволу (" + perm + ")"); return; }
+    try { await backupStep("запис", writeToHandle(handle)); backupNeedsClick = false; renderBackupBtn(); toast("💾 Копію оновлено"); }
+    catch (e) { await fallback(e.name + ": " + e.message); }
     return;
   }
-  const known = await idbGet("fileHandle");
-  if (known) {
-    try {
-      if ((await known.requestPermission(RW)) === "granted") {
-        await writeToHandle(known);
-        toast("💾 Копію оновлено");
-        return;
-      }
-    } catch (e) { console.warn("[backup] дозвіл на файл не отримано", e); }
-  }
   try {
-    const handle = await window.showSaveFilePicker({
+    $("backup-btn").textContent = "⏳ вибір файлу…";
+    handle = await window.showSaveFilePicker({
       suggestedName: "workquest_backup.json",
       types: [{ description: "JSON backup", accept: { "application/json": [".json"] } }]
     });
     await idbSet("fileHandle", handle);
-    await writeToHandle(handle);
+    await backupStep("запис", writeToHandle(handle));
+    backupNeedsClick = false; renderBackupBtn();
     toast("💾 Файл копії обрано — далі оновлюється сам");
-  } catch (e) { /* користувач закрив діалог — це нормальний вихід */ }
+  } catch (e) {
+    if (e.name === "AbortError") { renderBackupBtn(); return; }
+    await fallback(e.name + ": " + e.message);
+  }
 }
 
 // Вік копії рахується РІЗНИЦЕЮ КЛЮЧІВ ДАТ, а не (Date.now() − parse(дата)):
@@ -2873,6 +2901,9 @@ function renderBackupBtn() {
   const age = backupAgeDays();
   const b = $("backup-btn");
   b.classList.remove("warn");
+  b.title = backupNeedsClick ? "Браузер скинув дозвіл на запис у файл копії (після перезапуску чи оновлення Chrome). " +
+    "Клікни — і в запиті обери «Дозволяти під час кожного відвідування», тоді копія знову йтиме сама. Shift+клік — вибрати інший файл." : "Shift+клік — вибрати інший файл";
+  if (backupNeedsClick && age !== 0) { b.textContent = "💾 Копія" + (age === null ? "" : " " + age + "д тому") + " · натисни"; b.classList.add("warn"); return; }
   if (age === null) { b.textContent = hasFSA ? "💾 Налаштувати копію" : "💾 Зробити копію"; b.classList.add("warn"); return; }
   if (age === 0) { b.textContent = "💾 Копія сьогодні ✓"; return; }
   b.textContent = "💾 Копія " + age + "д тому";
